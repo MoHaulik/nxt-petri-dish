@@ -108,7 +108,7 @@ const CFG = {
   PINCH: { on: .02, gap: .02, cap: .035 }, HOVER: { on: .06, off: .09 }, // thumb-to-index metres; hysteresis after Meta's grab spec, a little looser for raw joints
   DROPS: 8, STEP_TIMEOUT: 10, DIM: .3,
   ROUNDS: [3, 4, 4, 5, 5, 6, 6], // sequence length per round; a success in round n brings stage n+1
-  HOME: { y: .74 }, GOD_TIME: 65, // seconds of town life after they recognise you, before they need more room
+  HOME: { y: .74 }, GOD_TIME: 88, // seconds of town life after they recognise you, before they need more room
  // ?sim / poster desk height
 };
 const STAINS = [
@@ -500,7 +500,7 @@ function updHands(dt) {
     if (!ok) { h.tracked = false; h.lost += dt; if (h.pinch && h.lost > .3) { h.pinch = false; h.up = true; } continue; }
     if (!h.tracked || h.lost > .3) h.tipPrev.copy(h.tip); h.tracked = true; h.lost = 0;
     h.tipVel.lerp(_v.subVectors(h.tip, h.tipPrev).divideScalar(Math.max(dt, .004)), .4); h.tipPrev.copy(h.tip); h.d = d;
-    if (!h.pinch) { if (d < CFG.PINCH.on) { h.pinch = true; h.down = true; h.minD = d; } }
+    if (!h.pinch) { if (d < CFG.PINCH.on) { h.pinch = true; h.down = true; h.minD = d; h.pinches = (h.pinches || 0) + 1; } }
     else { h.minD = Math.min(h.minD, d); if (d > Math.min(h.minD + CFG.PINCH.gap, CFG.PINCH.cap)) { h.pinch = false; h.up = true; } }
   }
 }
@@ -751,7 +751,7 @@ function pickAct(b, i, bs) {
 function glyph(b, y, shape, a = 1) { const k = shape === 4 ? [1, .42, .5] : shape === 5 ? [1, .88, .45] : shape === 6 ? [.75, .82, 1] : [1, .9, .6]; glow.add(CFG.DISH.x + b.x, CFG.DISH.agar + y + b.size * 2 + Math.sin(T * 3 + b.ph) * b.size * .15, CFG.DISH.z + b.z, b.size * .5, k[0], k[1], k[2], a * .9, shape); }
 function updBeings(dt, deadAt) {
   const bs = L.beings; if (!bs.length) { BODY.count = CREST.count = ARM.count = 0; return; }
-  const big = S.stage >= 6, sp = big ? .016 : .007, god = S.recognised && S.phase !== 'recog' && !FIN.on;
+  const big = S.stage >= 6, sp = big ? .016 : .007, god = S.recognised && S.phase !== 'recog' && !FIN.on && !EVT_PHASES.has(S.phase);
   let hx = 0, hz = 0, hy = 9, hvy = 0; for (const h of PH) if (h.tracked) { const x = h.tip.x - CFG.DISH.x, z = h.tip.z - CFG.DISH.z, y = h.tip.y - CFG.DISH.agar; if (Math.hypot(x, z) < .1 && y < hy) { hx = x; hz = z; hy = y; hvy = h.tipVel.y; } }
   const handNear = hy < .2 && S.phase !== 'recog', slam = handNear && hy < .07 && hvy < -.35;
   camera.getWorldPosition(_v3); toLab(_v3); const px = _v3.x - CFG.DISH.x, pz = _v3.z - CFG.DISH.z, py = _v3.y - CFG.DISH.agar, pr = Math.hypot(px, pz) + 1e-5;
@@ -788,7 +788,8 @@ function updBeings(dt, deadAt) {
     if (CIV.ev === 'parade' && !S.night) { const kk = b.role === 'mayor' ? -1 : b.role === 'band' ? (bs.indexOf(b)) - 1 : 5 + k++; const a = CIV.evT * .32 - kk * .085; tx = Math.cos(a) * .046; tz = Math.sin(a) * .046; speed = sp * 1.2; act = b.role === 'band' ? 'band' : 'march'; face = null; if (b.role === 'band' && Math.sin(T * 3 + b.ph) > .8) gly = 7; }
     if (CIV.ev === 'festival' && !S.night) { if (b.role !== 'band') { const a = i * 2.4, rr = .014 + (i % 5) * .006; tx = BANDSTAND[0] + Math.cos(a) * rr; tz = BANDSTAND[1] + Math.sin(a) * rr; act = 'dance'; } else { const a = (i % 6) / 5 * 6.283; tx = BANDSTAND[0] + Math.cos(a) * .006; tz = BANDSTAND[1] + Math.sin(a) * .006; act = 'band'; } speed = sp; }
     for (const g of CIV.gifts) if (g.t < 5 && Math.hypot(g.x - b.x, g.z - b.z) < .045 && act !== 'sleep') { tx = g.x + Math.cos(i) * .007; tz = g.z + Math.sin(i) * .007; speed = sp * 1.4; face = [g.x, g.z]; act = g.t > 2 ? 'cheer' : 'walk'; if (Math.hypot(tx - b.x, tz - b.z) < .004) gly = 4; }
-    if (recog) { act = S.t < 4 ? 'look' : S.t > 8 ? 'cheer' : 'gather'; const a = i / bs.length * 6.283 * 3, rr = .02 + (i % 3) * .009; if (S.t > 3) { tx = Math.cos(a) * rr; tz = Math.sin(a) * rr; speed = sp; } face = S.t > 4 && S.t < 8 ? [0, 0] : [px, pz]; }
+    if (EVT_PHASES.has(S.phase)) { const r = eventPose(b, i, bs, px, pz); if (r) { tx = r[0]; tz = r[1]; face = r[2]; act = r[3]; speed = sp * (r[4] || 1); if (r[5]) gly = r[5]; } }
+    else if (recog) { act = S.t < 4 ? 'look' : S.t > 8 ? 'cheer' : 'gather'; const a = i / bs.length * 6.283 * 3, rr = .02 + (i % 3) * .009; if (S.t > 3) { tx = Math.cos(a) * rr; tz = Math.sin(a) * rr; speed = sp; } face = S.t > 4 && S.t < 8 ? [0, 0] : [px, pz]; }
     else if (leanIn && act !== 'sleep') { const ux = px / pr, uz = pz / pr, side = ((i * .37) % 1 - .5) * 1.4; tx = ux * .05 - uz * side * .03; tz = uz * .05 + ux * side * .03; speed = sp; face = [px, pz]; act = 'reach'; if (i % 5 === 0) gly = 4; }
     else if (handNear && b.flee <= 0 && act !== 'panic' && act !== 'sleep') { const dx = b.x - hx, dz = b.z - hz, d = Math.hypot(dx, dz) + 1e-5, ring = .009 + (i % 4) * .004 + (big ? .004 : 0); tx = hx + dx / d * ring; tz = hz + dz / d * ring; speed = sp; face = [hx, hz]; if (d < ring * 1.6) { act = 'reach'; if (i % 4 === 0) gly = 4; } }
     if (CIV.gaze > 1.2 && !recog && act !== 'sleep' && (i % 3 === 0) && !handNear) { act = 'wave'; face = [px, pz]; speed *= .3; }
@@ -829,6 +830,8 @@ function updBeings(dt, deadAt) {
     else if (act === 'march') { aL = [beat * .7, .2]; aR = [-beat * .7, .2]; if (b.role === 'mayor') aR = [0, 2.5 + .4 * Math.sin(w)]; }
     else if (act === 'trip') { aL = [-2.6, .4]; aR = [-2.6, .4]; }
     else if (act === 'help') aR = [-1.6, .2];
+    else if (act === 'salute') aR = [-.9, 2.15 + Math.sin(T * 2 + i) * .04];
+    else if (act === 'paint') aR = [-1.3 + Math.sin(T * 11 + b.ph) * .5, .5 + Math.sin(T * 7 + b.ph) * .4];
     for (const side of [-1, 1]) { const a = side < 0 ? aL : aR; b['a' + side] = lerp(b['a' + side] ?? .25, a[1], damp(dt, .06)); b['x' + side] = lerp(b['x' + side] ?? 0, a[0], damp(dt, .06));
       _ma.makeRotationFromEuler(_ea.set(b['x' + side], 0, side * b['a' + side])).setPosition(side * .36, .6, .03); _ma.premultiply(_o.matrix); ARM.setMatrixAt(na++, _ma);
       if (side < 0 && big && act !== 'sleep') { _vh.set(0, -.36, 0).applyMatrix4(_ma); const lx = CFG.DISH.x + _vh.x, ly = CFG.DISH.agar + _vh.y, lz = CFG.DISH.z + _vh.z, kl = (.5 + VO.level * .9 + (act === 'hum' ? .35 : 0) + (S.night ? .6 : 0) + (CIV.ev === 'festival' ? .5 : 0) + (b.role === 'lamplighter' ? .4 : 0)) * s01(b.sz);
@@ -839,6 +842,95 @@ function updBeings(dt, deadAt) {
   if (n && (loud > .5 || (recog && S.t > 8)) && Math.random() < dt * 10) chirp(rand(2400, 3600), .05);
 }
 
+// ═══════════════════════════ THEIR WORKS ABOUT YOU: an anthem, a measurement, a portrait (and, at recognition, the hand) ═══════════════════════════
+// Each is made from something real about you, built in front of you, with a reveal. Spaced: stage 5, recognition, then twice in the god stretch.
+const EVT_PHASES = new Set(['anthem', 'measure', 'portrait']), EV = { t: 0 };
+const evTex = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.anisotropy = 8; return t; };
+// the flag and its pole
+const flagG = grp(lifeG, 0, 0, -.036); flagG.visible = false; const flagTex = evTex(256, 160);
+const flagPole = mesh(new THREE.CylinderGeometry(.0005, .0006, .04, 6).translate(0, .02, 0), M.brass, flagG); mesh(new THREE.SphereGeometry(.0011, 8, 6), M.brass, flagPole, { p: [0, .0405, 0] });
+const flagM = mesh(new THREE.PlaneGeometry(.022, .0137, 8, 1).translate(.011, 0, 0), new THREE.MeshStandardMaterial({ map: flagTex, side: THREE.DoubleSide, roughness: .7 }), flagG);
+// the sign
+const signG = grp(lifeG, .042, 0, .046); signG.visible = false; signG.rotation.y = -.5; const signTex = evTex(512, 256);
+mesh(new THREE.CylinderGeometry(.0006, .0006, .03, 6).translate(0, .015, 0), M.walnut, signG); mesh(new THREE.PlaneGeometry(.034, .017), new THREE.MeshStandardMaterial({ map: signTex, roughness: .8 }), signG, { p: [0, .027, .0008] });
+// the portrait: painted onto the agar, revealed stroke by stroke
+const portTex = evTex(512, 512), PORT = { uP: { value: 0 } };
+const portMat = new THREE.MeshStandardMaterial({ map: portTex, roughness: .55, transparent: true });
+portMat.onBeforeCompile = sh => { sh.uniforms.uP = PORT.uP; sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uP;').replace('#include <map_fragment>', '#include <map_fragment>\n{float row=1.-vUv.y;float edge=uP*1.12-.06+sin(vUv.x*38.+row*9.)*.012+sin(vUv.x*7.)*.02;if(row>edge)discard;}'); };
+const portM = mesh(new THREE.CircleGeometry(.028, 48).rotateX(-Math.PI / 2), portMat, lifeG, { p: [0, .00045, .03], cast: false }); portM.visible = false; portM.renderOrder = 2;
+function eventsReset() { flagG.visible = signG.visible = portM.visible = false; if (typeof HORDE !== 'undefined' && !FIN.on) HORDE.count = HCREST.count = 0; caption(''); S.anthemDone = S.towerDone = S.portraitDone = false; S.hum = S.hum || []; }
+function favStain() { const m = S.mix; return m.indexOf(Math.max(...m)); }
+// --- 1. the anthem: a flag of your colours, in proportion; an anthem that is your hum (or the order you dripped)
+function startAnthem() { setPhase('anthem'); EV.t = 0; EV.done = 0; const g = flagTex.image.getContext('2d'), w = 256, h = 160, m = S.mix, tot = m[0] + m[1] + m[2] || 1; let x = 0;
+  m.forEach((v, i) => { const ww = Math.round(v / tot * w); g.fillStyle = STAINS[i].hex; g.fillRect(x, 0, ww + 1, h); x += ww; }); if (x < w) g.fillRect(x, 0, w - x, h);
+  g.fillStyle = PAL.paper; g.beginPath(); g.moveTo(128, 34); g.bezierCurveTo(150, 72, 158, 92, 158, 104); g.arc(128, 104, 30, 0, Math.PI); g.bezierCurveTo(98, 92, 106, 72, 128, 34); g.fill(); // a drop of yours
+  g.strokeStyle = 'rgba(0,0,0,.15)'; g.lineWidth = 6; g.strokeRect(0, 0, w, h); flagTex.needsUpdate = true;
+  const hum = (S.hum || []).slice(-8); EV.fromHum = hum.length >= 4; EV.mel = EV.fromHum ? hum.map(n => { while (n < 67) n += 12; while (n > 84) n -= 12; return 440 * Math.pow(2, (n - 69) / 12); }) : S.drops.slice(-8).map(d => STAINS[d[0]].note);
+  if (EV.mel.length < 3) EV.mel = [523.25, 659.25, 783.99, 659.25, 523.25]; EV.k = 0; flagG.visible = true; flagPole.scale.y = .001; flagM.position.y = .002; }
+// --- 2. how tall is the Creator: a human tower to your fingertip, then a sign with your real height, in citizens
+function startMeasure() { setPhase('measure'); EV.t = 0; EV.sign = 0; EV.lock = null; EV.still = 0; EV.n = 0; EV.reach = -1; EV.fall = -1; }
+function fingerOver() { for (const h of PH) if (h.tracked) { const x = h.tip.x - CFG.DISH.x, z = h.tip.z - CFG.DISH.z, y = h.tip.y - CFG.DISH.agar; if (Math.hypot(x, z) < .055 && y > .03 && y < .2) return [x, y, z, h.tipVel.length()]; } return null; }
+function drawSign(n) { const g = signTex.image.getContext('2d'), w = 512, h = 256; g.fillStyle = PAL.paper; g.fillRect(0, 0, w, h); g.fillStyle = PAL.rule; g.fillRect(0, 0, w, 16); g.fillRect(0, h - 16, w, 16); g.fillStyle = PAL.ink; g.textAlign = 'center';
+  g.font = '500 44px Jost'; g.fillText('THE CREATOR IS', w / 2, 78); g.font = '600 92px Jost'; g.fillText(n.toLocaleString('en-US'), w / 2, 168); g.font = '400 32px "Courier Prime"'; g.fillText('citizens tall (approx.)', w / 2, 218); signTex.needsUpdate = true; }
+// --- 3. the portrait: from memory. Your favourite colour on top, a headset for a face, the hand you favour holding your dropper, and the dishes you lost.
+function startPortrait() { setPhase('portrait'); EV.t = 0; EV.done = 0; PORT.uP.value = 0; portM.visible = true;
+  const g = portTex.image.getContext('2d'), W = 512, fav = STAINS[favStain()], lefty = (() => { let l = 0, r = 0; for (const h of PH) { const hd = h.src && h.src.handedness; if (hd === 'left') l += h.pinches || 0; else r += h.pinches || 0; } return l > r; })();
+  EV.lefty = lefty; camera.getWorldQuaternion(_q); _e.setFromQuaternion(_q, 'YXZ'); const roll = clamp(_e.z, -.5, .5) + .12;
+  g.fillStyle = '#f3e9d2'; g.fillRect(0, 0, W, W); g.strokeStyle = PAL.rule; g.lineWidth = 14; g.beginPath(); g.arc(256, 256, 244, 0, 7); g.stroke();
+  const wob = (f) => { g.lineWidth = f; g.lineJoin = g.lineCap = 'round'; };
+  g.save(); g.translate(256, 300); // body
+  g.fillStyle = '#e6dcc2'; g.strokeStyle = '#5a4e3c'; wob(6); g.beginPath(); g.ellipse(0, 70, 58, 84, 0, 0, 7); g.fill(); g.stroke();
+  g.save(); g.translate(0, -60); g.rotate(roll); // the head: your headset, with eyes painted on the visor, and a crest of your favourite colour
+  g.fillStyle = fav.hex; g.beginPath(); g.moveTo(-14, -60); g.quadraticCurveTo(10, -150, 52, -128); g.quadraticCurveTo(22, -96, 18, -60); g.fill(); g.stroke();
+  g.fillStyle = '#3b3a38'; g.beginPath(); g.roundRect(-92, -64, 184, 108, 34); g.fill(); g.stroke(); g.strokeStyle = '#2a2826'; wob(10); g.beginPath(); g.moveTo(-92, -10); g.lineTo(-126, -22); g.moveTo(92, -10); g.lineTo(126, -22); g.stroke();
+  g.fillStyle = '#ffffff'; for (const sx of [-40, 40]) { g.beginPath(); g.arc(sx, -12, 15, 0, 7); g.fill(); } g.fillStyle = '#1c1b19'; for (const sx of [-36, 44]) { g.beginPath(); g.arc(sx, -8, 7, 0, 7); g.fill(); }
+  g.strokeStyle = '#e8dfc8'; wob(5); g.beginPath(); g.arc(0, 18, 22, .25, Math.PI - .25); g.stroke(); g.restore();
+  const side = lefty ? -1 : 1; g.save(); g.translate(side * 96, 30); // the enormous hand, holding your dropper
+  g.fillStyle = '#efd5b8'; g.strokeStyle = '#5a4e3c'; wob(6); g.beginPath(); g.ellipse(0, 0, 46, 40, 0, 0, 7); g.fill(); g.stroke();
+  for (let f = 0; f < 4; f++) { g.beginPath(); g.ellipse(-30 + f * 20, -48, 11, 30, (f - 1.5) * .12, 0, 7); g.fill(); g.stroke(); } g.beginPath(); g.ellipse(-side * 50, 4, 26, 12, side * .5, 0, 7); g.fill(); g.stroke();
+  g.fillStyle = 'rgba(220,235,235,.9)'; g.fillRect(-6, -150, 12, 110); g.strokeRect(-6, -150, 12, 110); g.fillStyle = PAL.rubber; g.beginPath(); g.ellipse(0, -164, 15, 22, 0, 0, 7); g.fill(); g.stroke();
+  g.fillStyle = fav.hex; g.fillRect(-4, -96, 8, 50); g.beginPath(); g.arc(0, 0 + 70, 9, 0, 7); g.fill(); g.restore();
+  g.restore();
+  const d = S.deaths || 0; g.strokeStyle = '#4a4034'; wob(5); for (let k = 0; k < Math.min(d, 8); k++) { const x = 110 + k * 26, y = 418; g.beginPath(); g.moveTo(x, y - 18); g.lineTo(x, y + 18); g.moveTo(x - 9, y - 6); g.lineTo(x + 9, y - 6); g.stroke(); }
+  g.fillStyle = PAL.ink; g.font = '500 30px Jost'; g.textAlign = 'center'; g.save(); g.translate(256, 470); g.rotate(-.03); g.fillText('THE CREATOR', 0, 0); g.restore(); portTex.needsUpdate = true; }
+function eventPose(b, i, bs, px, pz) { // where everybody stands during the works: [x, z, face, act, speedK, glyph]
+  const p = S.phase, t = EV.t;
+  if (p === 'anthem') { const row = Math.floor(i / 9), col = i % 9; const x = (col - 4) * .0062, z = -.026 + row * .0065; if (t < 3) return [x, z, null, 'walk', 1.2]; return [x, z, EV.done ? [px, pz] : [0, -.036], EV.done ? 'cheer' : t > 6 ? 'salute' : 'look', 1]; }
+  if (p === 'measure') { const L0 = EV.lock || [0, .08, 0]; const a = i / bs.length * 6.283, rr = .011 + (i % 3) * .006; return [L0[0] + Math.cos(a) * rr, L0[2] + Math.sin(a) * rr, EV.sign ? [px, pz] : [L0[0], L0[2]], EV.sign ? 'cheer' : EV.lock ? 'look' : 'idle', 1, EV.reach > 0 && !EV.sign && i % 6 === 0 ? 5 : 0]; }
+  if (p === 'portrait') { const edgeZ = .002 + PORT.uP.value * .056, cz = .03;
+    if (i < 12) { const x = (i / 11 - .5) * .044, w = Math.sqrt(Math.max(0, .028 * .028 - (edgeZ - cz) ** 2)); return [clamp(x, -w, w), edgeZ - .004, [clamp(x, -w, w), edgeZ + .01], EV.done ? 'cheer' : 'paint', 1.3]; }
+    const a = Math.PI * (.15 + .7 * ((i - 12) / Math.max(1, bs.length - 12))), rr = .036 + (i % 3) * .006; return [Math.cos(a + Math.PI) * rr, cz - Math.sin(a) * rr * .2 - .03, EV.done ? [px, pz] : [0, cz], EV.done ? 'cheer' : 'look', 1, EV.done && i % 5 === 0 ? 4 : 0]; }
+  return null;
+}
+function updEvents(dt) {
+  const p = S.phase; EV.t += dt; const t = EV.t;
+  if (p === 'anthem') { const caps = [[.5, 'They have chosen a flag.'], [3.5, 'Its colours are the ones you gave them. In proportion.'], [8, 'And an anthem.'], [11, EV.fromHum ? 'It is the tune you hummed at them.' : 'It is the order you dripped them in.'], [99, 'Nobody has the heart to tell them.']];
+    let cap = ''; for (const [ct, tx] of caps) if (t >= ct) cap = tx; if (EV.done) cap = 'Nobody has the heart to tell them.'; caption(cap); card('National day', ['A flag. An anthem.', '', '', '']);
+    flagPole.scale.y = Math.max(.001, s01((t - 3) / 2.5)); const t0 = 6.5, per = .62, k = Math.floor((t - t0) / per);
+    if (t > t0 && k < EV.mel.length && k !== EV.k - 1) { EV.k = k + 1; const f = EV.mel[k]; vibe(f, now(), .16, dishPan(), 1.4); vibe(f / 2, now(), .08, dishPan(), 1.6); if (k % 2 === 0) noiseHit(now(), .12, 5000, .7, .03, A.sfx || A.comp); }
+    const prog = clamp((t - t0) / (EV.mel.length * per), 0, 1); flagM.position.y = .003 + prog * .03; flagM.rotation.y = Math.sin(T * 3) * .25; const fp = flagM.geometry.attributes.position; for (let v = 0; v < fp.count; v++) { const x = fp.getX(v); fp.setZ(v, Math.sin(x * 400 - T * 8) * .0012 * (x / .022)); } fp.needsUpdate = true;
+    if (prog >= 1 && !EV.done) { EV.done = t; fanfare(); fireworks(2); cheer(); }
+    if (EV.done && t - EV.done > 4.5) { EV.done = 0; S.anthemDone = true; caption(''); setPhase('grow'); } }
+  if (p === 'measure') { const f = fingerOver();
+    if (!EV.lock) { caption(t < 1 ? '' : 'They wished to know how big you are.'); card('Measurement', ['Hold a finger still', 'over the dish.', '', '']);
+      if (f && f[3] < .15) EV.still += dt; else EV.still = 0; if (EV.still > .8 || t > 9) { EV.lock = f && EV.still > .8 ? [f[0], f[1], f[2]] : [0, .08, .015]; EV.N = Math.max(6, Math.min(30, Math.round(EV.lock[1] / .0049))); EV.lockT = t; sfx('ready', dishPan()); } }
+    else { const tt = t - EV.lockT; EV.n = Math.min(EV.N, Math.floor(tt * 2.6)); if (EV.n >= EV.N && EV.reach < 0) { EV.reach = t; vibe(1568, now(), .15, dishPan(), 1.2); vibe(2093, now() + .1, .12, dishPan(), 1.2); }
+      if (EV.reach > 0 && t - EV.reach > 2 && !EV.sign) { EV.sign = t; camera.getWorldPosition(_v); const hgt = renderer.xr.isPresenting ? _v.y : 1.62; drawSign(Math.round(hgt / .0052)); signG.visible = true; fanfare(); fireworks(2); cheer(); }
+      if (EV.sign) signG.position.y = lerp(-.03, 0, s01((t - EV.sign) / .8)); if (EV.sign && t - EV.sign > 3 && EV.fall < 0) { EV.fall = t; sfx('boing', dishPan()); }
+      caption(EV.sign ? (t - EV.sign < 3.5 ? 'This is how tall you are. In citizens.' : 'They have decided not to think about it.') : EV.reach > 0 ? 'This is one finger.' : 'They began to count.');
+      card('Measurement', EV.sign ? ['Result: enormous.', '', '', ''] : [`${EV.n} citizens high.`, '', '', '']);
+      // the tower itself: real little citizens, standing on each other's heads
+      const L0 = EV.lock; let n = 0; camera.getWorldPosition(_v3); for (let k = 0; k < EV.n; k++) { const fall = EV.fall > 0 ? t - EV.fall : 0, sway = Math.sin(T * 2 + k * .3) * k * .0002;
+        _hp.set(CFG.DISH.x + L0[0] + sway + (fall ? Math.sin(k * 2.1) * fall * .02 * k / EV.N : 0), CFG.DISH.agar + k * .0049 * (fall ? Math.max(0, 1 - fall * .6) : 1), CFG.DISH.z + L0[2] + (fall ? Math.cos(k * 2.1) * fall * .02 * k / EV.N : 0)); toWorld(_hp);
+        hordeAdd(n++, _hp, .0052, _v3, 0, STAINS[k % 3].c); }
+      HORDE.count = HCREST.count = n; HORDE.instanceMatrix.needsUpdate = HCREST.instanceMatrix.needsUpdate = true; HORDE.instanceColor.needsUpdate = HCREST.instanceColor.needsUpdate = true;
+      if (EV.fall > 0 && t - EV.fall > 2.2) { HORDE.count = HCREST.count = 0; S.towerDone = true; EV.sign = 0; EV.lock = null; caption(''); setPhase('grow'); } } }
+  if (p === 'portrait') { PORT.uP.value = s01((t - 2) / 12); const caps = [[.5, 'They wanted a picture of you.'], [6, 'They worked from memory.'], [14.2, 'Portrait of the Creator.'], [17, EV.lefty ? 'They noticed you favour your left hand.' : 'They noticed you favour your right hand.'], [19.5, (S.deaths || 0) ? 'They included the dishes you lost.' : 'Likeness: excellent. Crest: generous.']];
+    let cap = ''; for (const [ct, tx] of caps) if (t >= ct) cap = tx; caption(cap); card('Fine art', t < 14 ? ['Work in progress.', 'Do not look.', '', ''] : ['Portrait of the', 'Creator. Oil on agar.', '', '']);
+    if (t > 2 && t < 14 && Math.random() < dt * 5) { noiseHit(now(), .09, rand(1500, 2600), 1.5, .025, A.sfx || A.comp); }
+    if (t > 14 && !EV.done) { EV.done = t; fanfare(); fireworks(3); cheer(); }
+    if (t > 23) { EV.done = 0; S.portraitDone = true; caption(''); setPhase('grow'); } }
+}
 // ═══════════════════════════ DISH: the sequence, the answer, death and life ═══════════════════════════
 const S = { phase: 'poster', t: 0, stage: 0, round: 0, seq: [], step: 0, stepT: 0, replayed: false, mix: [0, 0, 0], drops: [], dishOK: true, blight: false, monT: 0, unpackT: 0, colonyBoot: false, fails: 0, per: .9, lampKick: 0, binWob: 0, stageUpT: -99, cause: [] };
 const FLASH = { i: 0, c: new C(), g: 0, gi: 0 };
@@ -870,7 +962,7 @@ function success() {
 function fail(x, z, st) {
   S.fails++; FLASH.i = 0; FLASH.gi = 0; S.cause = pick(CAUSES); S.wrong = { x, z, c: st ? st.c : new C(PAL.soot) };
   sfx('uhoh', dishPan());
-  if (S.stage === 0) { setPhase('dead'); AG.uDead.value.set(x, z, 0, Math.random() * 9); AG.uDeadF.value = 1; }
+  if (S.stage === 0) { S.deaths = (S.deaths || 0) + 1; setPhase('dead'); AG.uDead.value.set(x, z, 0, Math.random() * 9); AG.uDeadF.value = 1; }
   else { setPhase('blight'); S.blight = true; AG.uDead.value.set(x * .6, z * .6, 0, Math.random() * 9); AG.uDeadF.value = 1; for (const b of L.beings) { b.flee = rand(.6, 1.4); b.act = 'panic'; b.actT = 2.5; } }
 }
 function updDish(dt) {
@@ -883,8 +975,11 @@ function updDish(dt) {
     else if (S.t > t0 + S.seq.length * per + .25) { setPhase('drip'); S.stepT = 0; sfx('turn', dishPan()); for (const q of PIPS) q.glint = 1; }
   }
   if (p === 'drip') { S.stepT += dt; if (S.stepT > CFG.STEP_TIMEOUT) { if (!S.replayed) { startRound(false); S.replayed = true; } else fail(0, 0); } }
-  if (p === 'success' && S.t > 2.6) { if (S.stage >= 6 && !S.recognised) { S.recognised = true; setPhase('recog'); S.monT = T + 3; monG.visible = true; chord(); } else setPhase('grow'); }
-  if (p === 'grow' && S.recognised && !FIN.on && (T - S.godStart > CFG.GOD_TIME || S.godWins >= 2) && S.t > 4) startExpand();
+  if (p === 'success' && S.t > 2.6) { if (S.stage >= 5 && S.stage < 6 && !S.anthemDone) startAnthem(); else if (S.stage >= 6 && !S.recognised) { S.recognised = true; setPhase('recog'); S.monT = T + 3; monG.visible = true; chord(); } else setPhase('grow'); }
+  if (p === 'grow' && S.recognised && !FIN.on && !S.towerDone && T - S.godStart > 12 && S.t > 3) startMeasure();
+  else if (p === 'grow' && S.recognised && !FIN.on && S.towerDone && !S.portraitDone && T - S.godStart > 48 && S.t > 3) startPortrait();
+  else if (p === 'grow' && S.recognised && !FIN.on && S.portraitDone && (T - S.godStart > CFG.GOD_TIME || S.godWins >= 3) && S.t > 4) startExpand();
+  if (EVT_PHASES.has(p)) updEvents(dt);
   else if (p === 'grow' && S.t > (S.recognised ? 32 : S.stage >= 4 ? 7 : 5)) startRound();
   if (p === 'recog') { for (const [tt, n] of [[3.5, 3], [6, 4], [8.5, 8], [10, 6]]) if (S.t > tt && S.t - dt <= tt) fireworks(n); if (S.t > 8.5 && S.t - dt <= 8.5) cheer(); if (S.t > 15) { setPhase('grow'); S.godStart = T; news(['They know you now.', 'Drip a gift, any', 'colour. Tap the lamp', 'base for night.']); } }
   // death, with comic timing: a beat, an "uh-oh", the mould, the trombone, a burp, the cause
@@ -1003,6 +1098,7 @@ function updVoice(dt) {
   const k = VO.sim; lvl = k.loud ? .9 : k.hum ? .4 : 0; pitch = k.hum ? lerp(140, 420, k.x || .5) : 0; onset = !!k.clap; k.clap = false; voiceState(dt, lvl, pitch, onset);
 }
 function voiceState(dt, lvl, pitch, onset, hold) {
+  if (VO.hum && VO.pitch > 60) { VO.recT = (VO.recT || 0) + dt; if (VO.recT > .35) { VO.recT = 0; const m = Math.round(12 * Math.log2(VO.pitch / 440) + 69); const hm = S.hum || (S.hum = []); if (hm[hm.length - 1] !== m || hm.length === 0) { hm.push(m); if (hm.length > 12) hm.shift(); } } }
   if (!hold) { VO.level = lerp(VO.level, lvl, .5); if (onset) { VO.onset = 1; VO.lastSound = T; }
     if (pitch) { VO.pitch = VO.voiced > 0 ? lerp(VO.pitch, pitch, .4) : pitch; VO.voiced += dt; } else VO.voiced = Math.max(0, VO.voiced - dt * 2); }
   VO.loudT = VO.level > .6 ? VO.loudT + dt : 0; VO.loud = VO.loudT > .12 ? 1 : 0; VO.hum = VO.voiced > .35 && VO.level < .8 ? 1 : 0; VO.rate = clamp(VO.pitch / 260, .4, 1.6);
@@ -1031,7 +1127,7 @@ function vibe(f, t, v = .3, pos = null, dur = 2.4, dest) { if (!A.ctx) return; c
   const g = c.createGain(); env(g, t, .003, v, dur); g.connect(tr); osc('sine', f, t, dur, g);
   const g2 = c.createGain(); env(g2, t, .002, v * .3, .35); g2.connect(tr); osc('sine', f * 3.93, t, .4, g2);
   const g3 = c.createGain(); env(g3, t, .001, v * .12, .05); g3.connect(tr); osc('triangle', f * 9.1, t, .08, g3); }
-function noiseHit(t, dur, f, q, v, dest, type = 'bandpass') { const c = A.ctx, s = c.createBufferSource(); s.buffer = A.noise; const bp = c.createBiquadFilter(); bp.type = type; bp.frequency.value = f; bp.Q.value = q; const g = c.createGain(); env(g, t, .002, v, dur); s.connect(bp).connect(g).connect(dest); s.start(t, Math.random() * .5); s.stop(t + dur + .05); return bp; }
+function noiseHit(t, dur, f, q, v, dest, type = 'bandpass') { if (!A.ctx || !dest) return { frequency: { exponentialRampToValueAtTime() { } } }; const c = A.ctx, s = c.createBufferSource(); s.buffer = A.noise; const bp = c.createBiquadFilter(); bp.type = type; bp.frequency.value = f; bp.Q.value = q; const g = c.createGain(); env(g, t, .002, v, dur); s.connect(bp).connect(g).connect(dest); s.start(t, Math.random() * .5); s.stop(t + dur + .05); return bp; }
 function sfx(k, pos, v = 1) { if (!A.ctx) return; const c = A.ctx, t = c.currentTime, d = out(pos, .3);
   if (k === 'plop') { const o = c.createOscillator(), g = c.createGain(); o.frequency.setValueAtTime(rand(1100, 1400), t); o.frequency.exponentialRampToValueAtTime(260, t + .07); env(g, t, .002, .35 * v, .09); o.connect(g).connect(d); o.start(t); o.stop(t + .15); noiseHit(t, .03, 4000, 1, .08 * v, d); }
   else if (k === 'pick') { vibe(1568, t, .05, pos, .4, d); noiseHit(t, .04, 3000, 2, .06, d); }
@@ -1389,7 +1485,7 @@ function loop(time, frame) {
 function resetAll(demo) {
   for (const p of PIPS) { if (p.hand) p.hand.hold = null; pipHome(p); p.fv = CFG.DROPS; p.squash = 0; p.beadT = -1; p.bead.visible = false; }
   for (const d of DROPS) lab.remove(d.m); DROPS.length = SPLASH.length = SPLATS.length = RINGS.length = PUFFS.length = 0;
-  lifeReset(); fieldReset(); Object.assign(S, { stage: 0, round: 0, seq: [], step: 0, mix: [0, 0, 0], drops: [], blight: false, recognised: false, cureT: 0, night: false, nightK: 0, godWins: 0, godStart: T, fails: 0 }); CIV.ev = null; CIV.news = null; CIV.gifts.length = 0;
+  lifeReset(); fieldReset(); Object.assign(S, { stage: 0, round: 0, seq: [], step: 0, mix: [0, 0, 0], drops: [], blight: false, recognised: false, cureT: 0, night: false, nightK: 0, godWins: 0, godStart: T, fails: 0 }); CIV.ev = null; CIV.news = null; CIV.gifts.length = 0; eventsReset();
   AG.uDead.value.set(0, 0, 0, 0); AG.uDeadF.value = 0; AG.uColony.value = 0; SC.theta = SC.tgt = CFG.SCOPE.park; SC.drag = null; dishG.position.set(CFG.DISH.x, 0, CFG.DISH.z); dishG.rotation.set(0, 0, 0); dishG.visible = true; stack.forEach(s => { s.visible = true; });
   if (demo) { // the poster: a culture that has come a long way
     S.mix = [5, 3, 4]; for (let i = 0; i < 14; i++) { const [x, z] = dishPoint(.05, .02), st = Math.random() * 3 | 0; bloom(st, x, z, .7); S.drops.push([st, x, z]); }
@@ -1434,7 +1530,7 @@ if (SIM) {
 function go(stage) { if (S.phase === 'poster') begin(false); S.unpackT = T - 9; MUS.on = false; for (let s = S.stage + 1; s <= stage; s++) { S.stage = s; S.round = s; buildStage(s); } if (stage >= 3) gsSteps(500); if (stage >= 6) S.recognised = true; startRound(); }
 function drip(st, x = 0, z = 0) { dishDrop(STAINS[st], x, z); }
 function answer() { for (const c of S.seq.slice(S.step)) drip(c, rand(-.03, .03), rand(-.03, .03)); }
-window.__T = { step: (sec, fdt = 1 / 30) => { DBG.fdt = fdt; for (let k = 0; k < sec / fdt; k++) loop(0, null); DBG.fdt = 0; }, finale: () => { go(6); S.recognised = true; startExpand(); }, FIN, CIV, GOO, setNight, gift, S, L, PH, PIPS, SC, VO, AG, CFG, DBG, go, drip, answer, begin, fail, lab, camera, scene, renderer, THREE, setLook: v => { simLook = v; } };
+window.__T = { ev: { startAnthem, startMeasure, startPortrait, EV, PORT }, step: (sec, fdt = 1 / 30) => { DBG.fdt = fdt; for (let k = 0; k < sec / fdt; k++) loop(0, null); DBG.fdt = 0; }, finale: () => { go(6); S.recognised = true; startExpand(); }, FIN, CIV, GOO, setNight, gift, S, L, PH, PIPS, SC, VO, AG, CFG, DBG, go, drip, answer, begin, fail, lab, camera, scene, renderer, THREE, setLook: v => { simLook = v; } };
 
 // ═══════════════════════════ BOOT ═══════════════════════════
 (async () => {
