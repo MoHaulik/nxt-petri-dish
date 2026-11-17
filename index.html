@@ -108,7 +108,7 @@ const CFG = {
   PINCH: { on: .02, gap: .02, cap: .035 }, HOVER: { on: .06, off: .09 }, // thumb-to-index metres; hysteresis after Meta's grab spec, a little looser for raw joints
   DROPS: 8, STEP_TIMEOUT: 10, DIM: .3,
   ROUNDS: [3, 4, 4, 5, 5, 6, 6], // sequence length per round; a success in round n brings stage n+1
-  HOME: { y: .74 }, GOD_TIME: 100, // seconds of town life after they recognise you, before they need more room
+  HOME: { y: .74 }, GOD_TIME: 65, // seconds of town life after they recognise you, before they need more room
  // ?sim / poster desk height
 };
 const STAINS = [
@@ -349,7 +349,7 @@ var GOOGLSL_A = `uniform vec3 uGooC;uniform float uGooR,uGooT,uGrey;uniform samp
   float gN(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(gH(i),gH(i+vec2(1,0)),f.x),mix(gH(i+vec2(0,1)),gH(i+vec2(1,1)),f.x),f.y);}
   float gooMask(vec3 p){if(uGooR<=0.)return 0.;vec3 d=p-uGooC;float r=length(d);vec2 a=normalize(d.xz+1e-5);
     float n=gN(a*3.+7.)*.45+gN(a*9.+uGooT*.15)*.2+gN(p.xz*40.)*.25+gN(p.xz*160.)*.1;float R=uGooR*(.72+.56*n);return smoothstep(R,R-.002-uGooR*.008,r);}
-  vec3 crowdAt(vec2 uv){vec2 c=floor(uv*9.);uv.y+=.02*abs(sin(uGooT*(6.+gH(c)*4.)+gH(c)*6.283));vec3 col=texture2D(uCrowd,uv).rgb;return mix(col,vec3(dot(col,vec3(.3,.45,.25)))*vec3(1.,.96,.88),uGrey);}`;
+  vec3 crowdAt(vec2 uv){vec2 c=floor(uv*9.);uv.y+=.02*abs(sin(uGooT*(6.+gH(c)*4.)+gH(c)*6.283));vec3 col=texture2D(uCrowd,uv).rgb*vec3(.6,.55,.47);return mix(col,vec3(dot(col,vec3(.3,.45,.25)))*vec3(1.,.96,.88),uGrey*.6);}`;
 const DEADGLSL = `uniform vec4 uDead;uniform float uDeadF;float deadMask(vec2 p){if(uDead.z<=0.)return 0.;vec2 d=p-uDead.xy;vec2 a=normalize(d+1e-5);
   float n=vn(a*3.+uDead.w)*.45+vn(a*9.+uDead.w*2.)*.2;float R=uDead.z*(.8+n);return (1.-smoothstep(R*.8,R,length(d)))*uDeadF;}`;
 const agarMat = new THREE.ShaderMaterial({ uniforms: AG,
@@ -370,7 +370,7 @@ const agarMat = new THREE.ShaderMaterial({ uniforms: AG,
       float dd=deadMask(vL.xz);if(dd>0.){float n=fbm(vL.xz*700.),fz=vn(vL.xz*2600.);vec3 m=mix(uSoot,uMould,n)*(light*.7);m=mix(m,uFuzz*light,smoothstep(.62,.95,fz)*.7);col=mix(col,m,dd);}
       col+=uFlashC*uFlashI*(1.-r*r*.6)*1.5+(uFlashC*2.2+.35)*uGlyphI*glyph(vL.xz/uR);
       vec3 R=reflect(-V,N);float Fr=.02+.98*pow(1.-max(dot(N,V),0.),5.);col+=texture2D(uEnv,eq(R)).rgb*Fr*.9+uLampC*pow(max(dot(N,normalize(L+V)),0.),500.)*att*14.;
-      col=mix(col,pow(crowdAt(vW.xz*15.),vec3(2.2))*.8,gooMask(vW));gl_FragColor=vec4(col,1.);${OUT}}` });
+      col=mix(col,crowdAt(vW.xz*14.),gooMask(vW));gl_FragColor=vec4(col,1.);${OUT}}` });
 const agar = mesh(agarGeo, agarMat, dishG, { cast: false }); agar.renderOrder = 1;
 mesh(agarSideGeo, agarMat, dishG, { cast: false });
 // what the microscope sees of the agar: bright field, warm light from below, fibres, colonies as packed cells (layer 5: the microscope only)
@@ -514,7 +514,7 @@ function updPipettes(dt) {
   for (const h of PH) {
     if (!h.tracked) continue;
     if (h.down) {
-      if (h.hold) squeeze(h.hold);
+      if (h.hold) { if (rackDist(h.hold.g.position) < .075 && h.hold.left) dock(h.hold); else squeeze(h.hold); } // a pinch over the rack puts it back, never drips
       else {
         let best = null, bd = CFG.HOVER.on; for (const p of PIPS) if (p.state === 'rack' || p.state === 'return') { const dd = p.g.position.distanceTo(h.P) - (p.hover > .5 ? .015 : 0); if (dd < bd) { bd = dd; best = p; } }
         if (best) { best.state = 'held'; best.hand = h; h.hold = best; best.left = false; best.lost = 0; best.snap = 0; best.snapFrom = best.g.position.clone(); best.tip.copy(best.g.position).y -= PIP_LEN; best.tipPrev.copy(best.tip); best.pop = 1; best.glint = 1; sfx('pick', best.g.position); buzz(h, .5, 40); }
@@ -539,9 +539,14 @@ function updPipettes(dt) {
       // the bulb follows your fingers between squeezes
       const open = clamp((h.d - .012) / .04, 0, 1); p.sqT = (1 - open) * .45;
       // back to its own bottle: dock
-      slotPos(p, _v); _v.y = BOTTLE_TOP + .016; const dTip = Math.hypot(p.tip.x - _v.x, p.tip.z - _v.z);
-      if (!p.left && (dTip > .05 || p.tip.y > _v.y + .05)) p.left = true;
-      if (p.left && dTip < .024 && p.tip.y < _v.y + .015) { dock(p); continue; }
+      // putting it back is easy: anywhere over the rack (any slot) counts, and it flies home to its own bottle by itself
+      const dr = rackDist(p.g.position); if (!p.left && dr > .085) p.left = true;
+      p.nearRack = p.left && dr < .07 && p.g.position.y < .3; // generous, but stops short of the dish (its nearest rim is 7.9 cm away)
+      if (p.nearRack) { p.dockT = (p.dockT || 0) + dt; if (p.dockT > .12) { dock(p); continue; } } else p.dockT = 0;
+      // while you hold it, its bottle glows a welcome
+      slotPos(p, _v); const pulse = .5 + .5 * Math.sin(T * 5), near = s01((.2 - dr) / .13);
+      glow.add(_v.x, BOTTLE_TOP + .019, _v.z, .016 + .004 * pulse + near * .008, p.st.c.r, p.st.c.g, p.st.c.b, .35 + .35 * near, 1); glow.add(_v.x, BOTTLE_TOP + .019, _v.z, .01, p.st.c.r, p.st.c.g, p.st.c.b, .25 + .3 * near);
+      for (let k = 1; k <= 4; k++) glow.add(_v.x, BOTTLE_TOP + .02 + k * .018 + (T * .03 % .018), _v.z, .004, p.st.c.r, p.st.c.g, p.st.c.b, (.12 + .2 * near) * (1 - k / 5));
     }
     else if (p.state === 'return') { p.ret = Math.min(1, p.ret + dt / .45); slotPos(p, _v); p.g.position.lerpVectors(p.retFrom, _v, s01(p.ret)); p.g.position.y += Math.sin(p.ret * Math.PI) * .05; p.g.quaternion.slerpQuaternions(p.retQ, _q.identity(), s01(p.ret)); if (p.ret >= 1) { pipHome(p); sfx('clink', p.g.position); } }
     if (p.state !== 'held') p.sqT = 0; p.sqV = (p.sqV || 0) + ((p.sqT || 0) - p.squash) * 900 * dt; p.sqV *= Math.exp(-dt * 22); p.squash += p.sqV * dt; // a springy rubber bulb
@@ -556,7 +561,8 @@ function squeeze(p) {
   if (p.fill <= 0) { p.sqV = -5; sfx('puff', p.g.position); return; } if (p.beadT >= 0) return;
   p.fill--; p.beadT = 0; p.sqV = -6; sfx('squeeze', p.g.position); buzz(p.hand, .3, 25);
 }
-function dock(p) { buzz(p.hand, .4, 30); p.state = 'return'; p.ret = .6; p.retFrom.copy(p.g.position); p.retQ.copy(p.g.quaternion); if (p.hand) p.hand.hold = null; p.hand = null; sfx('dip', p.g.position); if (p.fill < CFG.DROPS) setTimeout(() => sfx('gurgle', p.g.position), 250); p.st.pulse = .8; }
+function rackDist(pos) { return Math.hypot(clamp(pos.x - CFG.RACK.x, -.06, .06) - (pos.x - CFG.RACK.x), pos.z - CFG.RACK.z); } // distance from the rack's row of slots
+function dock(p) { p.beadT = -1; p.bead.visible = false; p.dockT = 0; p.nearRack = false; buzz(p.hand, .4, 30); p.state = 'return'; p.ret = .6; p.retFrom.copy(p.g.position); p.retQ.copy(p.g.quaternion); if (p.hand) p.hand.hold = null; p.hand = null; sfx('dip', p.g.position); if (p.fill < CFG.DROPS) setTimeout(() => sfx('gurgle', p.g.position), 250); p.st.pulse = .8; }
 function goHome(p) { p.state = 'return'; p.ret = 0; p.retFrom.copy(p.g.position); p.retQ.copy(p.g.quaternion); if (p.hand) p.hand.hold = null; p.hand = null; }
 
 // ═══════════════════════════ DROPS: bead, neck, fall, splash, bloom ═══════════════════════════
@@ -627,11 +633,11 @@ function colonyPoint(rmax = .055) { for (let k = 0; k < 30; k++) { const [x, z] 
 // structures: an instanced kit (domes, spires, arches, atomic-age roofs), glowing faintly from inside in their lineage's colour
 function gelMat(col, glowK) { const m = std(col, .32, 0, { envMapIntensity: .9 }); m.onBeforeCompile = sh => { sh.uniforms.uGlow = { value: glowK }; m.userData.u = sh.uniforms; sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uGlow;').replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n#if defined(USE_INSTANCING_COLOR)\ntotalEmissiveRadiance+=vColor*uGlow;\n#endif'); }; return m; }
 const KIT = {
-  dome: new THREE.InstancedMesh(new THREE.SphereGeometry(1, 20, 10, 0, 6.283, 0, Math.PI / 2), gelMat('#f6ecd6', .35), 40),
-  spire: new THREE.InstancedMesh(mergeBufferGeometries([new THREE.CylinderGeometry(.1, .3, 1, 10).translate(0, .5, 0), new THREE.SphereGeometry(.4, 12, 8).scale(1, .3, 1).translate(0, 1.04, 0), new THREE.CylinderGeometry(.45, .45, .04, 14).translate(0, .62, 0)]), gelMat('#f6ecd6', .5), 24),
+  dome: new THREE.InstancedMesh(new THREE.SphereGeometry(1, 20, 10, 0, 6.283, 0, Math.PI / 2), gelMat('#f6ecd6', .35), 140),
+  spire: new THREE.InstancedMesh(mergeBufferGeometries([new THREE.CylinderGeometry(.1, .3, 1, 10).translate(0, .5, 0), new THREE.SphereGeometry(.4, 12, 8).scale(1, .3, 1).translate(0, 1.04, 0), new THREE.CylinderGeometry(.45, .45, .04, 14).translate(0, .62, 0)]), gelMat('#f6ecd6', .5), 60),
   arch: new THREE.InstancedMesh(new THREE.TorusGeometry(1, .14, 8, 20, Math.PI), gelMat('#f2e6cc', .3), 16),
-  pod: new THREE.InstancedMesh(mergeBufferGeometries([new THREE.CylinderGeometry(.4, .46, .4, 16).translate(0, .2, 0), new THREE.SphereGeometry(.4, 16, 8, 0, 6.283, 0, Math.PI / 2).scale(1, .6, 1).translate(0, .4, 0)]), gelMat('#f4ead2', .25), 20),
-  roof: new THREE.InstancedMesh(mergeBufferGeometries([new THREE.BoxGeometry(1, .06, .5).translate(.45, 0, 0).rotateZ(.22), new THREE.BoxGeometry(1, .06, .5).translate(-.45, 0, 0).rotateZ(-.22), new THREE.CylinderGeometry(.04, .04, .7, 6).translate(.55, -.35, 0), new THREE.CylinderGeometry(.04, .04, .7, 6).translate(-.55, -.35, 0)]).translate(0, .7, 0), gelMat(PAL.cream, .2), 20),
+  pod: new THREE.InstancedMesh(mergeBufferGeometries([new THREE.CylinderGeometry(.4, .46, .4, 16).translate(0, .2, 0), new THREE.SphereGeometry(.4, 16, 8, 0, 6.283, 0, Math.PI / 2).scale(1, .6, 1).translate(0, .4, 0)]), gelMat('#f4ead2', .25), 60),
+  roof: new THREE.InstancedMesh(mergeBufferGeometries([new THREE.BoxGeometry(1, .06, .5).translate(.45, 0, 0).rotateZ(.22), new THREE.BoxGeometry(1, .06, .5).translate(-.45, 0, 0).rotateZ(-.22), new THREE.CylinderGeometry(.04, .04, .7, 6).translate(.55, -.35, 0), new THREE.CylinderGeometry(.04, .04, .7, 6).translate(-.55, -.35, 0)]).translate(0, .7, 0), gelMat(PAL.cream, .2), 60),
 };
 for (const k in KIT) { const m = KIT[k]; m.count = 0; m.castShadow = true; m.receiveShadow = true; m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(m.instanceMatrix.count * 3), 3); lifeG.add(m); }
 // beings: a bean of a body, two dot eyes, one tuft crest in their lineage's colour (it is how you tell them apart)
@@ -685,12 +691,12 @@ function updLife(dt) {
     if (i % 2 === 0) glow.add(ox + c.x, oy + .0005, oz + c.z, .0013, 1, .93, .8, k * (.3 + .15 * Math.sin(T * 3 + c.ph)) * (st >= 4 ? .4 : 1)); });
   // structures
   const grow = (born, dur = 2.5) => outBack((T - born) / dur);
-  let n = 0; for (const d of L.domes) { const g = grow(d.born); if (g <= 0) continue; _o.position.set(d.x, 0, d.z); _o.rotation.set(0, 0, 0); _o.scale.set(d.r, d.r * (1.05 + .06 * Math.sin(T + d.r * 900)), d.r).multiplyScalar(g * (deadAt(d.x, d.z) ? .6 : 1)); if (st >= 6 && g > .9) { const a = d.r * 4000; glow.add(ox + d.x + Math.cos(a) * d.r * .95, oy + d.r * .35, oz + d.z + Math.sin(a) * d.r * .95, d.r * .5, 1, .78, .42, .55 + .15 * Math.sin(T * 1.7 + a)); } _o.updateMatrix(); KIT.dome.setMatrixAt(n, _o.matrix); KIT.dome.setColorAt(n, _c.copy(STAINS[d.lin].c).lerp(new C(PAL.cream), .55)); n++; } KIT.dome.count = n;
-  n = 0; for (const s of L.spires) { const g = grow(s.born, 3); if (g <= 0) continue; _o.position.set(s.x, 0, s.z); _o.rotation.set(0, 0, 0); _o.scale.set(s.h * .3, s.h * g, s.h * .3); _o.updateMatrix(); KIT.spire.setMatrixAt(n, _o.matrix); KIT.spire.setColorAt(n, _c.copy(STAINS[s.lin].c).lerp(new C(PAL.cream), .3)); n++;
-    if (s.star && g > .9) { const tp = _v.set(ox + s.x, oy + s.h * 1.06, oz + s.z); glow.addC(tp, .006, STAINS[s.lin].c, (S.night ? .08 + (s.lit || 0) * 1.1 : .55) + .25 * Math.sin(T * 3 + s.h * 500), 2, T * .3); glow.add(tp.x, tp.y, tp.z, .0012, 1, .96, .85, 1); } } KIT.spire.count = n;
+  let n = 0; for (const d of L.domes) { const g = grow(d.born); if (g <= 0) continue; _o.position.set(d.x, d.y || 0, d.z); _o.rotation.set(0, 0, 0); _o.scale.set(d.r, d.r * (1.05 + .06 * Math.sin(T + d.r * 900)), d.r).multiplyScalar(g * (deadAt(d.x, d.z) ? .6 : 1)); if (st >= 6 && g > .9) { const a = d.r * 4000; glow.add(ox + d.x + Math.cos(a) * d.r * .95, oy + (d.y || 0) + d.r * .35, oz + d.z + Math.sin(a) * d.r * .95, d.r * .5, 1, .78, .42, .55 + .15 * Math.sin(T * 1.7 + a)); } _o.updateMatrix(); KIT.dome.setMatrixAt(n, _o.matrix); KIT.dome.setColorAt(n, _c.copy(STAINS[d.lin].c).lerp(new C(PAL.cream), .55)); n++; } KIT.dome.count = n;
+  n = 0; for (const s of L.spires) { const g = grow(s.born, 3); if (g <= 0) continue; _o.position.set(s.x, s.y || 0, s.z); _o.rotation.set(0, 0, 0); _o.scale.set(s.h * .3, s.h * g, s.h * .3); _o.updateMatrix(); KIT.spire.setMatrixAt(n, _o.matrix); KIT.spire.setColorAt(n, _c.copy(STAINS[s.lin].c).lerp(new C(PAL.cream), .3)); n++;
+    if (s.star && g > .9) { const tp = _v.set(ox + s.x, oy + (s.y || 0) + s.h * 1.06, oz + s.z); glow.addC(tp, .006, STAINS[s.lin].c, (S.night ? .08 + (s.lit || 0) * 1.1 : .55) + .25 * Math.sin(T * 3 + s.h * 500), 2, T * .3); glow.add(tp.x, tp.y, tp.z, .0012, 1, .96, .85, 1); } } KIT.spire.count = n;
   n = 0; for (const a of L.arches) { const g = grow(a.born, 3); if (g <= 0) continue; const mx = (a.a.x + a.b.x) / 2, mz = (a.a.z + a.b.z) / 2, half = Math.hypot(a.b.x - a.a.x, a.b.z - a.a.z) / 2; _o.position.set(mx, 0, mz); _o.rotation.set(0, -Math.atan2(a.b.z - a.a.z, a.b.x - a.a.x), 0); _o.scale.set(half, half * .8 * g, half * .5); _o.updateMatrix(); KIT.arch.setMatrixAt(n, _o.matrix); KIT.arch.setColorAt(n, _c.copy(STAINS[a.lin].c).lerp(new C(PAL.cream), .5)); n++; } KIT.arch.count = n;
-  n = 0; for (const r of L.roofs) { const g = grow(r.born, 2); if (g <= 0) continue; _o.position.set(r.x, 0, r.z); _o.rotation.set(0, r.ry, 0); _o.scale.setScalar(r.s * g); _o.updateMatrix(); KIT.roof.setMatrixAt(n, _o.matrix); KIT.roof.setColorAt(n, _c.copy(STAINS[r.lin].c).lerp(new C(PAL.cream), .45)); KIT.pod.setMatrixAt(n, _o.matrix); KIT.pod.setColorAt(n, _c.copy(STAINS[r.lin].c).lerp(new C(PAL.cream), .75)); n++;
-    glow.add(ox + r.x, oy + r.s * .5, oz + r.z, r.s * 1.1, 1, .8, .5, .35 * g); } KIT.roof.count = KIT.pod.count = n;
+  n = 0; for (const r of L.roofs) { const g = grow(r.born, 2); if (g <= 0) continue; _o.position.set(r.x, r.y || 0, r.z); _o.rotation.set(0, r.ry, 0); _o.scale.setScalar(r.s * g); _o.updateMatrix(); KIT.roof.setMatrixAt(n, _o.matrix); KIT.roof.setColorAt(n, _c.copy(STAINS[r.lin].c).lerp(new C(PAL.cream), .45)); KIT.pod.setMatrixAt(n, _o.matrix); KIT.pod.setColorAt(n, _c.copy(STAINS[r.lin].c).lerp(new C(PAL.cream), .75)); n++;
+    glow.add(ox + r.x, oy + (r.y || 0) + r.s * .5, oz + r.z, r.s * 1.1, 1, .8, .5, .35 * g); } KIT.roof.count = KIT.pod.count = n;
   for (const k in KIT) { KIT[k].instanceMatrix.needsUpdate = true; if (KIT[k].instanceColor) KIT[k].instanceColor.needsUpdate = true; }
   updBeings(dt, deadAt);
   // rings where drops land
@@ -1183,8 +1189,8 @@ const GOOGLSL = `uniform vec3 uGooC;uniform float uGooR,uGooT,uGrey;uniform samp
   float gN(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(gH(i),gH(i+vec2(1,0)),f.x),mix(gH(i+vec2(0,1)),gH(i+vec2(1,1)),f.x),f.y);}
   float gooMask(vec3 p){if(uGooR<=0.)return 0.;vec3 d=p-uGooC;float r=length(d);vec2 a=normalize(d.xz+1e-5);
     float n=gN(a*3.+7.)*.45+gN(a*9.+uGooT*.15)*.2+gN(p.xz*40.)*.25+gN(p.xz*160.)*.1;float R=uGooR*(.72+.56*n);return smoothstep(R,R-.002-uGooR*.008,r);}
-  vec3 crowdAt(vec2 uv){vec2 c=floor(uv*9.);uv.y+=.02*abs(sin(uGooT*(6.+gH(c)*4.)+gH(c)*6.283));vec3 col=texture2D(uCrowd,uv).rgb;return mix(col,vec3(dot(col,vec3(.3,.45,.25)))*vec3(1.,.96,.88),uGrey);}
-  vec3 crowdTri(vec3 p,vec3 n){vec3 w=abs(n);w/=w.x+w.y+w.z+1e-4;float s=15.;return crowdAt(p.xz*s)*w.y+crowdAt(p.xy*s)*w.z+crowdAt(p.zy*s)*w.x;}`;
+  vec3 crowdAt(vec2 uv){vec2 c=floor(uv*9.);uv.y+=.02*abs(sin(uGooT*(6.+gH(c)*4.)+gH(c)*6.283));vec3 col=texture2D(uCrowd,uv).rgb*vec3(.6,.55,.47);return mix(col,vec3(dot(col,vec3(.3,.45,.25)))*vec3(1.,.96,.88),uGrey*.6);}
+  vec3 crowdTri(vec3 p,vec3 n){vec3 w=abs(n);w/=w.x+w.y+w.z+1e-4;float s=14.;return crowdAt(p.xz*s)*w.y+crowdAt(p.xy*s)*w.z+crowdAt(p.zy*s)*w.x;}`;
 // every standard material in the lab learns to be covered in citizens
 const gooed = new Set();
 function gooify(m) { if (gooed.has(m) || !m.isMeshStandardMaterial) return; gooed.add(m); const prev = m.onBeforeCompile;
@@ -1196,22 +1202,22 @@ function gooify(m) { if (gooed.has(m) || !m.isMeshStandardMaterial) return; gooe
       #endif
       vGW=(modelMatrix*gw).xyz;vGN=normalize(mat3(modelMatrix)*gn);}`);
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vGW,vGN;\n' + GOOGLSL).replace('#include <dithering_fragment>', `#include <dithering_fragment>
-      {float gm=gooMask(vGW);if(gm>0.){vec3 c=crowdTri(vGW,vGN);gl_FragColor.rgb=mix(gl_FragColor.rgb,c*(.72+.28*abs(vGN.y)),gm);}}`); };
+      {float gm=gooMask(vGW);if(gm>0.){vec3 c=pow(crowdTri(vGW,vGN),vec3(.4545));gl_FragColor.rgb=mix(gl_FragColor.rgb,c*(.8+.2*abs(vGN.y)),gm);}}`); };
   m.customProgramCacheKey = () => 'goo' + (prev ? prev.toString().length : 0); m.needsUpdate = true; }
 // the desk beyond the tray: a carpet of them, spreading over the real table
 const deskGoo = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.6).rotateX(-Math.PI / 2), new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: GOO,
   vertexShader: `varying vec3 vW;void main(){vec4 w=modelMatrix*vec4(position,1.);vW=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}`,
-  fragmentShader: `${GOOGLSL}varying vec3 vW;void main(){float m=gooMask(vW);if(m<=0.)discard;vec3 c=pow(crowdAt(vW.xz*15.),vec3(2.2))*.85;gl_FragColor=vec4(c,m);${OUT}}` }));
+  fragmentShader: `${GOOGLSL}varying vec3 vW;void main(){float m=gooMask(vW);if(m<=0.)discard;vec3 c=crowdAt(vW.xz*14.);gl_FragColor=vec4(c,m);${OUT}}` }));
 deskGoo.position.y = -CFG.TRAY.base + .0012; deskGoo.renderOrder = 2; deskGoo.visible = false; lab.add(deskGoo);
 // the leading edge, your hands, your face: real little citizens, cheering (arms up is baked in), one lean mesh for hundreds
-const hordeGeo = (() => { const b = new THREE.SphereGeometry(1, 10, 7); const p = b.attributes.position; for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i) * .42, p.getY(i) * .5 + .5, p.getZ(i) * .38); b.computeVertexNormals();
+const hordeGeo = (() => { const b = new THREE.SphereGeometry(1, 9, 6); const p = b.attributes.position; for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i) * .42, p.getY(i) * .5 + .5, p.getZ(i) * .38); b.computeVertexNormals();
   const arm = s => new THREE.CylinderGeometry(.06, .05, .34, 5).translate(0, .17, 0).rotateZ(-s * .5).translate(s * .34, .62, .02);
-  const eye = s => new THREE.SphereGeometry(.075, 6, 4).translate(s * .13, .68, .34);
+  const eye = s => new THREE.SphereGeometry(.075, 5, 3).translate(s * .13, .68, .34);
   const col = (g, hex) => { const c = new C(hex), n = g.attributes.position.count; g.setAttribute('color', new THREE.Float32BufferAttribute(new Array(n).fill(0).flatMap(() => [c.r, c.g, c.b]), 3)); return g; };
   return mergeBufferGeometries([col(b, PAL.cream), col(arm(-1), PAL.cream), col(arm(1), PAL.cream), col(eye(-1), PAL.ink), col(eye(1), PAL.ink)].map(g => g.toNonIndexed())); })();
-const HN = 420, HORDE = new THREE.InstancedMesh(hordeGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .55, emissive: new C('#a08c68'), emissiveIntensity: .45 }), HN);
+const HN = 1000, HORDE = new THREE.InstancedMesh(hordeGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .55, emissive: new C('#a08c68'), emissiveIntensity: .45 }), HN);
 const HCREST = new THREE.InstancedMesh(new THREE.ConeGeometry(.11, .42, 6).translate(0, .21, 0).rotateX(-.55).translate(0, .95, -.04), new THREE.MeshStandardMaterial({ roughness: .4, emissive: new C('#ffffff'), emissiveIntensity: .25 }), HN);
-const FLAGS = new THREE.InstancedMesh(mergeBufferGeometries([new THREE.CylinderGeometry(.0004, .0004, .016, 4).translate(0, .008, 0), new THREE.BufferGeometry().setFromPoints([new V(0, .016, 0), new V(.009, .0135, 0), new V(0, .011, 0)]).setIndex([0, 1, 2]).toNonIndexed()].map(g => { g = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(g.attributes)) if (k !== 'position') g.deleteAttribute(k); g.computeVertexNormals(); return g; })), new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, roughness: .6 }), 12);
+const FLAGS = new THREE.InstancedMesh(mergeBufferGeometries([new THREE.CylinderGeometry(.0004, .0004, .016, 4).translate(0, .008, 0), new THREE.BufferGeometry().setFromPoints([new V(0, .016, 0), new V(.009, .0135, 0), new V(0, .011, 0)]).setIndex([0, 1, 2]).toNonIndexed()].map(g => { g = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(g.attributes)) if (k !== 'position') g.deleteAttribute(k); g.computeVertexNormals(); return g; })), new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, roughness: .6 }), 48);
 for (const m of [HORDE, HCREST, FLAGS]) { m.count = 0; m.frustumCulled = false; m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(m.instanceMatrix.count * 3), 3); scene.add(m); }
 // your view: a wall of little faces closing in from the edges, then black
 const VIS = { uV: { value: 0 }, uBlack: { value: 0 }, uFwd: { value: new V() }, ...GOO };
@@ -1219,8 +1225,8 @@ const visGoo = new THREE.Mesh(new THREE.SphereGeometry(.3, 40, 24), new THREE.Sh
   vertexShader: `varying vec3 vW;void main(){vec4 w=modelMatrix*vec4(position,1.);vW=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}`,
   fragmentShader: `${GOOGLSL}uniform float uV,uBlack;uniform vec3 uFwd;varying vec3 vW;
     void main(){vec3 d=normalize(vW-cameraPosition);float e=acos(clamp(dot(d,uFwd),-1.,1.))/1.25;vec2 a=vec2(atan(d.z,d.x)*2.4,asin(d.y)*2.4);
-      float n=gN(a*1.3+uGooT*.2)*.22+gN(a*5.)*.08;float th=1.08-uV*1.25;float m=smoothstep(th-.03,th+.03,e+n-.15);
-      vec3 c=pow(crowdAt(a*1.1),vec3(2.2))*(.55+.45*smoothstep(1.2,.2,e));c=mix(c,vec3(0.),uBlack);float al=max(m,uBlack);if(al<=.001)discard;gl_FragColor=vec4(c,al);${OUT}}` }));
+      float n=gN(a*1.3+uGooT*.2)*.22+gN(a*5.)*.08;float th=1.0*(1.-uV);float m=smoothstep(th-.03,th+.03,e+n-.15);
+      m=smoothstep(th+.05,th+.16,e+n*.4);vec3 c=vec3(.15,.11,.075)*(.55+.45*gN(a*9.+uGooT*.3))*(.7+.3*smoothstep(1.2,.3,e));c=mix(c,vec3(0.),uBlack);float al=max(m,uBlack);if(al<=.001)discard;gl_FragColor=vec4(c,al);${OUT}}` }));
 visGoo.renderOrder = 3000; visGoo.frustumCulled = false; visGoo.visible = false; scene.add(visGoo);
 // captions and the end card: a filmstrip subtitle under your view, a title card in front of it
 function capTex(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t; }
@@ -1239,15 +1245,16 @@ function drawEnd(stage) { const c = endT.image, g = c.getContext('2d'), w = c.wi
   endT.needsUpdate = true; }
 const FIN = { on: false, t: 0, R: 0, c: new V(), hand: [0, 0], vis: 0, flags: 0, chant: 0, H: [] };
 const EXP = [{ x: CFG.STACK.x, z: CFG.STACK.z + .005 }, { x: .172, z: .102 }].map((e, k) => { const g = grp(lab, e.x, 0, e.z); glassMesh(dishGeo, g); const a = mesh(agarGeo, agarMat, g, { cast: false }); a.rotation.y = 1.7 + k * 2.1; mesh(agarSideGeo, agarMat, g, { cast: false }); g.visible = false; return { ...e, g, bridge: null }; });
-function startExpand() { FIN.on = true; setPhase('expand'); CIV.ev = null; S.night = false; news(['They need room.', '', '']); sfx('ready', dishPan()); }
+function startExpand() { FIN.on = true; FIN.t = 0; setPhase('expand'); CIV.ev = null; S.night = false; news(['They need room.', '', '']); sfx('ready', dishPan()); }
 function expandGo() { if (S.phase !== 'expand') return; setPhase('migrate'); sfx('pick', _v.set(CFG.STACK.x, .05, CFG.STACK.z)); }
 const CAPS = [[0, 'The citizens needed more room.'], [-1, ''], ];
 function updFinale(dt) {
   if (!FIN.on) return; const p = S.phase, t = S.t; FIN.t += dt;
+  if (p !== 'expand') { FIN.cardK = Math.min(1, (FIN.cardK || 0) + dt / 1.5); const k = s01(FIN.cardK); cardG.position.set(lerp(CFG.CARD.x, .0, k), lerp(0, -CFG.TRAY.base, k), lerp(CFG.CARD.z, .215, k)); cardG.rotation.y = lerp(-.42, 0, k); } // the card steps off the tray to make room
   if (p === 'expand') { caption(t > 1 ? 'The citizens needed more room.' : ''); card('Procedure', ['They need room.', 'Tap the spare dishes', 'to set them out.', '']); if (t > 18) expandGo(); }
   if (p === 'migrate') { // the spare dishes slide out, the lids come off, little bridges grow, and the proud migrants walk across
     caption(t < 6 ? 'Science provided. They were very proud.' : 'Suburbs! With bridges!');
-    stack.forEach(s => { s.visible = false; }); cardG.position.y = lerp(0, -.2, s01(t / 1)); cardG.visible = t < 1;
+    stack.forEach(s => { s.visible = false; });
     EXP.forEach((e, k) => { const kk = s01((t - k * .5) / 1.2); e.g.visible = kk > 0; e.g.position.set(lerp(CFG.STACK.x, e.x, kk), Math.sin(kk * Math.PI) * .04, lerp(CFG.STACK.z, e.z, kk));
       if (!e.bridge && t > 2) { const dx = e.x - CFG.DISH.x, dz = e.z - CFG.DISH.z, d = Math.hypot(dx, dz), ux = dx / d, uz = dz / d; const a = new V(ux * (DR - .002), CFG.DISH.agar + .001, uz * (DR - .002)), b = new V(dx - ux * (DR - .002), CFG.DISH.agar + .001, dz - uz * (DR - .002));
         const mid = a.clone().add(b).multiplyScalar(.5); mid.y += .022; e.bridge = mesh(new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(a, mid, b), 30, .0016, 6), M.enamelCream, lifeG); e.bridge.geometry.setDrawRange(0, 0); e.bt = 0;
@@ -1256,13 +1263,14 @@ function updFinale(dt) {
       if (e.bridge) { e.bt = Math.min(1, e.bt + dt / 2); e.bridge.geometry.setDrawRange(0, Math.floor(e.bridge.geometry.index.count * e.bt / 6) * 6); } });
     if (t > 2.2 && t - dt <= 2.2) fanfare(); if (t > 9 && t - dt <= 9) { fireworks(4); cheer(); }
     card('Expansion', ['Two new suburbs.', 'Population rising.', '', '']);
-    if (t > 13) { setPhase('goo'); FIN.c.set(EXP[1].x, CFG.DISH.agar, EXP[1].z); FIN.R = 0; deskGoo.visible = true; } }
+    if (t > 13) { setPhase('sprawl'); buildSettlements(); } }
+  if (p === 'sprawl') updSprawl(dt, t);
   if (p === 'goo') {
     // the tide: it starts in the right-hand suburb and does not stop
     FIN.R = t < 6 ? lerp(0, .075, s01(t / 6)) : t < 20 ? lerp(.075, .5, (t - 6) / 14) : lerp(.5, 1.3, Math.min(1, (t - 20) / 12));
     toWorld(GOO.uGooC.value.copy(FIN.c)); GOO.uGooR.value = FIN.R; GOO.uGrey.value = s01((t - 14) / 18) * .6;
     MUS.det = Math.min(80, t * 3); MUS.slow = Math.min(.35, t * .012);
-    const caps = [[0, 'Then one of them had an idea.'], [4.5, 'The idea was: more of us.'], [9, 'Everybody agreed.'], [14, 'They wished to thank their Creator. Personally.'], [21, 'A responsible scientist would now wash their hands.'], [26.5, 'Too late.'], [30, 'They loved you very, very much.']];
+    const caps = [[0, 'Then one of them had an idea.'], [4.5, 'The idea was: more of us.'], [9, 'Everybody agreed.'], [14, 'They wished to thank their Creator. Personally.'], [19, 'A responsible scientist would now wash their hands.'], [23.5, 'Too late.'], [28, 'They loved you very, very much.'], [35, 'Hold still. They are nearly finished.'], [41.5, 'There.']];
     let cap = ''; for (const [ct, tx] of caps) if (t >= ct) cap = tx; caption(cap);
     card('Procedure', t < 9 ? ['Hm.', '', '', ''] : ['Oh dear.', '', '', '']);
     // the old town: delighted, then briefly "oh no", then delighted again
@@ -1271,9 +1279,9 @@ function updFinale(dt) {
     // chanting
     FIN.chant -= dt; if (FIN.chant < 0) { FIN.chant = Math.max(.25, 1.6 - t * .05); creator(); }
     // hands: they arrive when the tide reaches a hand, or leap at 18 s regardless
-    for (const h of PH) { const d = h.tracked ? Math.hypot(h.tip.x - FIN.c.x, h.tip.z - FIN.c.z) : 9; if (d < FIN.R * .9 || t > 18) FIN.hand[h.i] = Math.min(1, FIN.hand[h.i] + dt / 9); }
-    FIN.vis = s01((t - 27) / 7); VIS.uV.value = FIN.vis; VIS.uBlack.value = s01((t - 34.5) / 1.5); visGoo.visible = FIN.vis > 0;
-    if (t > 36) { setPhase('end'); drawEnd(0); endM.visible = true; caption(''); musicStop(); MUS.det = 0; sfx('tada', null); } }
+    for (const h of PH) { const d = h.tracked ? Math.hypot(h.tip.x - FIN.c.x, h.tip.z - FIN.c.z) : 9; if (d < FIN.R * .9 || t > 16) FIN.hand[h.i] = Math.min(1, FIN.hand[h.i] + dt / 9); }
+    { const k = clamp((t - 24) / 20, 0, 1); FIN.vis = k * .62 + k * k * .38; } VIS.uV.value = FIN.vis; VIS.uBlack.value = s01((t - 44.3) / 1.4); visGoo.visible = FIN.vis > 0;
+    if (t > 46) { setPhase('end'); drawEnd(0); endM.visible = true; caption(''); musicStop(); MUS.det = 0; sfx('tada', null); } }
   if (p === 'end') { visGoo.visible = true; VIS.uBlack.value = 1; VIS.uV.value = 1; endM.material.opacity = s01(t / .8) * (.9 + .1 * Math.random()) * (1 - s01((t - 6.6) / .4) * (t < 7 ? 1 : 0)); if (t > 7 && t - dt <= 7) drawEnd(1); if (t > 7) endM.material.opacity = s01((t - 7) / .5) * (.92 + .08 * Math.random());
     if (Math.random() < dt * 24 && A.ctx) noiseHit(now(), .02, 2200, 2, .015, A.sfx); // the projector
     if (t > 8.5 && (PH.some(h => h.down) || FIN.click)) restart(); }
@@ -1300,16 +1308,62 @@ function updHorde(dt) {
       for (let k = 0; k < act && n < HN; k++) { const j = Math.min(pts.length - 1, Math.floor(k / 6)), ang = k * 2.39996, rad = j >= pts.length - 6 ? .034 : .012; _hp.copy(pts[j]).add(_v4.set(Math.cos(ang) * rad, Math.abs(Math.sin(ang)) * rad + .004, Math.sin(ang) * rad * .6));
         hordeAdd(n++, _hp, j >= pts.length - 6 ? .0075 : .0055, cam, Math.abs(Math.sin(T * 8 + k)) * .002, STAINS[k % 3].c); }
       if (!SIM) for (let k = 10; k < 14 && cov > .35 + (k - 10) * .1; k++) if (pts[k]) { _o.position.copy(pts[k]).y += .006; _o.rotation.set(0, T * .5 + k, Math.sin(T * 3 + k) * .1); _o.scale.setScalar(1); _o.updateMatrix(); FLAGS.setMatrixAt(nf, _o.matrix); FLAGS.setColorAt(nf, STAINS[k % 3].c); nf++; if (nf > FIN.flags) { FIN.flags = nf; say(3600, .05); sfx('tink', null, .4); } } }
+    // your view: a vignette of them closing in from every edge, a heaving pile of real little citizens over a dark depth,
+    // the window onto the room shrinking and shrinking. Two depth tiers: a dense pile behind, the climbers at the leading edge in front.
+    if (FIN.vis > 0 && VIS.uBlack.value < .6) { const fw = VIS.uFwd.value, rt = new V().crossVectors(fw, UP).normalize(), up = new V().crossVectors(rt, fw).normalize(); const th = 1.0 * (1 - FIN.vis);
+      const put = (e, ph, d) => _hp.copy(fw).multiplyScalar(Math.cos(e)).addScaledVector(rt, Math.sin(e) * Math.cos(ph)).addScaledVector(up, Math.sin(e) * Math.sin(ph)).multiplyScalar(d).add(cam);
+      const NP = 430; for (let k = 0; k < NP && n < HN; k++) { const e = 1.34 * Math.sqrt((k + .5) / NP), ph = k * 2.39996; if (e < th + .05) continue; const heave = Math.sin(T * 2.6 + k * .9) * .012;
+        put(e - heave * .5, ph, .2 + Math.sin(k * 3.1) * .025 + heave); hordeAdd(n++, _hp, .019 * (1 + .18 * Math.sin(k * 1.7)), cam, Math.abs(Math.sin(T * 5 + k)) * .003, STAINS[k % 3].c); }
+      const NF = 170; for (let k = 0; k < NF && n < HN; k++) { const ph = k / NF * 6.2832 + Math.sin(k * 7.7) * .03, e = th + .02 + (k % 3) * .045 + Math.sin(T * 3 + k) * .012; if (e > 1.34) continue;
+        put(e, ph, .13 + (k % 3) * .012); hordeAdd(n++, _hp, .0125, cam, Math.abs(Math.sin(T * 7 + k * 1.3)) * .004, STAINS[(k + 1) % 3].c);
+        if (k % 9 === 0 && nf < 48) { _o.position.copy(_hp).addScaledVector(up, .013); _o.lookAt(cam); _o.rotateZ(Math.sin(T * 4 + k) * .3); _o.scale.setScalar(1.3); _o.updateMatrix(); FLAGS.setMatrixAt(nf, _o.matrix); FLAGS.setColorAt(nf, STAINS[(k / 9 | 0) % 3].c); nf++; } } }
     FLAGS.count = nf; FLAGS.instanceMatrix.needsUpdate = true; if (nf) FLAGS.instanceColor.needsUpdate = true;
-    // your face: a wall of them closing in from the edges of your view, faces turned to you
-    if (FIN.vis > 0) { const fw = VIS.uFwd.value, rt = new V().crossVectors(fw, UP).normalize(), up = new V().crossVectors(rt, fw).normalize(); const th = 1.08 - FIN.vis * 1.25;
-      for (let k = 0; k < 110 && n < HN; k++) { const e = 1.2 * Math.sqrt((k + .5) / 110), ph = k * 2.39996 + Math.sin(T * .7 + k) * .03; if (e / 1.25 * 1.25 < th * 1.25 - .05) continue; const ee = e * .95; _hp.copy(fw).multiplyScalar(Math.cos(ee)).addScaledVector(rt, Math.sin(ee) * Math.cos(ph)).addScaledVector(up, Math.sin(ee) * Math.sin(ph)).multiplyScalar(.2).add(cam);
-        hordeAdd(n++, _hp, .02, cam, Math.abs(Math.sin(T * 6 + k)) * .004, STAINS[k % 3].c); } }
-  } else FLAGS.count = 0;
+  } else if (S.phase === 'sprawl') { FLAGS.count = 0; n = updSettlers(n, cam); }
+  else FLAGS.count = 0;
   HORDE.count = HCREST.count = n; for (const m of [HORDE, HCREST]) { m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; }
 }
-function restart() { FIN.on = false; FIN.click = false; FIN.hand = [0, 0]; FIN.flags = 0; FIN.vis = 0; GOO.uGooR.value = 0; GOO.uGrey.value = 0; VIS.uV.value = VIS.uBlack.value = 0; visGoo.visible = endM.visible = deskGoo.visible = false; caption(''); MUS.det = 0; MUS.slow = 0;
-  EXP.forEach(e => { e.g.visible = false; if (e.bridge) { lifeG.remove(e.bridge); e.bridge = null; } }); cardG.visible = true; cardG.position.y = 0; lifeG.visible = true; HORDE.count = HCREST.count = FLAGS.count = 0;
+// the sprawl: after the suburbs, outposts on the tray and settlements on the furniture, steady at first, then "hm, that's a lot"
+function buildSettlements() { const B = CFG.BIN, R = CFG.RACK, SC0 = CFG.SCOPE, LP = CFG.LAMP;
+  FIN.sets = [[-.07, 0, .145, .02], [.07, 0, .148, .018], [.0, 0, -.125, .02], [.09, 0, -.13, .016], [.235, 0, -.125, .014], [-.245, 0, -.02, .012], [.0, 0, .155, .012],
+    [R.x - .022, .089, R.z - .012, .006], [R.x + .022, .089, R.z - .012, .006], [SC0.x, .022, SC0.z + .01, .02], [LP.x, .017, LP.z, .022], [B.x, B.h - CFG.TRAY.base + .024, B.z, .045], [-.12, 0, .06, .012]]
+    .map(([x, y, z, r], k) => ({ x, y, z, r, k }));
+  FIN.spawn = 0; FIN.pop = L.beings.length + 44; }
+function settle(st, t) { const a = Math.random() * 6.283, rr = Math.sqrt(Math.random()) * st.r, x = st.x + Math.cos(a) * rr - CFG.DISH.x, z = st.z + Math.sin(a) * rr - CFG.DISH.z, y = st.y - CFG.DISH.agar + .0001, lin = lineage(), r = Math.random();
+  if (r < .62 && L.domes.length < 138) L.domes.push({ x, y, z, r: rand(.0014, .0028), lin, born: T });
+  else if (r < .85 && L.roofs.length < 58) L.roofs.push({ x, y, z, s: rand(.0035, .0055), ry: Math.random() * 6, lin, born: T });
+  else if (L.spires.length < 58) L.spires.push({ x, y, z, h: rand(.008, .014), lin, born: T, star: true, lit: 1 }); }
+function updSprawl(dt, t) {
+  const unlocked = Math.min(FIN.sets.length, 3 + Math.floor(t / 3)), rate = .6 + .045 * t * t; FIN.spawn += dt * rate;
+  while (FIN.spawn > 1) { FIN.spawn--; settle(FIN.sets[Math.floor(Math.pow(Math.random(), 1.3) * unlocked)], t); if (Math.random() < .3) say(rand(2600, 3400), .03); }
+  FIN.pop *= 1 + dt * (t < 20 ? .04 : .04 + (t - 20) * .03); // steady, then not
+  const caps = [[0, 'The suburbs filled up nicely.'], [8, 'Then the outskirts.'], [16, 'Then the furniture.'], [24, 'Hm. That is quite a lot.'], [30, 'That is a very great deal.']];
+  let cap = ''; for (const [ct, tx] of caps) if (t >= ct) cap = tx; caption(cap);
+  card('Census', [`Population: ${Math.round(FIN.pop).toLocaleString('en-US')}`, t < 16 ? 'Steady growth.' : t < 24 ? 'Healthy growth.' : 'Growth.', t < 24 ? 'Spirits: excellent.' : 'Spirits: excellent!!', '']);
+  if (t > 11 && t - dt <= 11) { fireworks(3); fanfare(); } if (t > 21 && t - dt <= 21) { fireworks(5); cheer(); }
+  MUS.slow = Math.max(0, (t - 24) * .006);
+  if (t > 35) { setPhase('goo'); FIN.c.set(EXP[1].x, CFG.DISH.agar, EXP[1].z); FIN.R = 0; deskGoo.visible = true; } }
+function updSettlers(n, cam) { // little citizens walking out from the dishes to the settlements: a handful, then a stream, then a crowd
+  const t = S.t, m = Math.min(300, Math.floor(6 + 3 * t + .22 * t * t)), sets = FIN.sets, unlocked = Math.min(sets.length, 3 + Math.floor(t / 3)), homes = [[CFG.DISH.x, CFG.DISH.z], ...EXP.map(e => [e.x, e.z])];
+  for (let k = 0; k < m && n < HN; k++) { const st = sets[(k * 7) % unlocked], h = homes[k % 3], f = (T * (.035 + (k % 5) * .006) + k * .1373) % 1, dx = st.x - h[0], dz = st.z - h[1], d = Math.hypot(dx, dz) + 1e-5;
+    const sx = h[0] + dx / d * DR, sz = h[1] + dz / d * DR; const ex = st.x - dx / d * st.r * .6, ez = st.z - dz / d * st.r * .6;
+    _hp.set(lerp(sx, ex, f), lerp(CFG.DISH.agar, st.y, s01(f)) + (st.y > .01 ? 0 : .0), lerp(sz, ez, f)); toWorld(_hp);
+    hordeAdd(n++, _hp, .0052, _v4.copy(_hp).add(_v.set(dx, 0, dz).applyQuaternion(lab.quaternion)), Math.abs(Math.sin(T * 9 + k)) * .0012, STAINS[k % 3].c); }
+  return n; }
+// the crowd carpet is not painted: it is the real citizen model, rendered once into a tile with the same material and light
+function bakeCrowd() {
+  const sc = new THREE.Scene(), P = .056, NG = 9, sp = P / NG, cnt = NG * NG * 18;
+  const body = new THREE.InstancedMesh(hordeGeo, HORDE.material, cnt), crest = new THREE.InstancedMesh(HCREST.geometry, HCREST.material, cnt); crest.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cnt * 3), 3);
+  let i = 0; for (const lay of [0, 1]) for (let gx = -NG; gx < NG * 2; gx++) for (let gz = -NG; gz < NG * 2; gz++) { const kx = ((gx % NG) + NG) % NG, kz = ((gz % NG) + NG) % NG, hsh = Math.sin(kx * 12.9898 + kz * 78.233 + lay * 4.1) * 43758.5453, r = hsh - Math.floor(hsh);
+    _o.position.set((gx + lay * .5) * sp + (r - .5) * sp * .3, lay * -.0015, (gz + lay * .5) * sp + (((r * 7) % 1) - .5) * sp * .3); _o.rotation.set(0, (r - .5) * .9, (r - .5) * .3); _o.scale.setScalar(.0068 * (.9 + r * .2)); _o.updateMatrix();
+    body.setMatrixAt(i, _o.matrix); crest.setMatrixAt(i, _o.matrix); crest.setColorAt(i, STAINS[Math.floor(r * 3)].c); i++; } // two staggered layers: a pile, no gaps
+  body.count = crest.count = i; sc.add(body, crest);
+  sc.add(new THREE.HemisphereLight('#f1e2c6', '#2a2018', .9)); const dl = new THREE.DirectionalLight('#ffd7a0', 1.6); dl.position.set(-.3, 1, .6); sc.add(dl);
+  const phi = .9, cam = new THREE.OrthographicCamera(0, P, P * Math.sin(phi) / 2, -P * Math.sin(phi) / 2, -1, 1); cam.position.set(0, Math.sin(phi), Math.cos(phi)).multiplyScalar(.3).add(new V(0, 0, P / 2)); cam.lookAt(0, 0, P / 2); cam.position.x = 0; cam.updateMatrixWorld();
+  const rt = new THREE.WebGLRenderTarget(512, 512, { samples: 4 }); rt.texture.wrapS = rt.texture.wrapT = THREE.RepeatWrapping; rt.texture.generateMipmaps = true; rt.texture.minFilter = THREE.LinearMipmapLinearFilter; rt.texture.anisotropy = 8;
+  const prev = renderer.getRenderTarget(); renderer.setRenderTarget(rt); renderer.setClearColor(0x6b5c45, 1); renderer.clear(); renderer.render(sc, cam); renderer.setClearColor(0x000000, 0); renderer.setRenderTarget(prev);
+  GOO.uCrowd.value = rt.texture; }
+function restart() { FIN.on = false; FIN.cardK = 0; FIN.click = false; FIN.hand = [0, 0]; FIN.flags = 0; FIN.vis = 0; GOO.uGooR.value = 0; GOO.uGrey.value = 0; VIS.uV.value = VIS.uBlack.value = 0; visGoo.visible = endM.visible = deskGoo.visible = false; caption(''); MUS.det = 0; MUS.slow = 0;
+  EXP.forEach(e => { e.g.visible = false; if (e.bridge) { lifeG.remove(e.bridge); e.bridge = null; } }); cardG.visible = true; cardG.position.set(CFG.CARD.x, 0, CFG.CARD.z); cardG.rotation.y = -.42; lifeG.visible = true; HORDE.count = HCREST.count = FLAGS.count = 0;
   resetAll(false); setPhase('unpack'); S.unpackT = T - 1.2; }
 // ═══════════════════════════ LOOP ═══════════════════════════
 const clock = new THREE.Clock(); const DBG = { fdt: 0 };
@@ -1390,6 +1444,7 @@ window.__T = { step: (sec, fdt = 1 / 30) => { DBG.fdt = fdt; for (let k = 0; k <
     const hm = mesh(geo, std(PAL.brass, .25, .85, { envMapIntensity: 1.4, emissive: new C('#8a5a1c'), emissiveIntensity: .55 }), monG, { p: [0, .006, 0] }); hm.userData.flip = true; } catch (e) { }
   placeLab(new V(0, CFG.HOME.y, 0), 0); resetAll(true); setPhase('poster'); framePoster(); card('Culture No. 1', ['Day 12. They have', 'built a town.', '', '']);
   lab.traverse(o => { if (o.isMesh && o !== deskGoo) (Array.isArray(o.material) ? o.material : [o.material]).forEach(gooify); });
+  try { bakeCrowd(); } catch (e) { console.warn('crowd bake', e); }
   { const hidden = []; scene.traverse(o => { if (!o.visible) { hidden.push(o); o.visible = true; } }); try { renderer.compile(scene, camera); } catch (e) { } hidden.forEach(o => { o.visible = false; }); }
   renderer.setAnimationLoop(loop);
   const ok = SIM || (navigator.xr && await navigator.xr.isSessionSupported('immersive-ar').catch(() => false));
