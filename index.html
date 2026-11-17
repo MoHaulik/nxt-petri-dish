@@ -104,7 +104,7 @@ const CFG = {
   TRAY: { w: .52, d: .34, base: .012, rim: .014 },
   DISH: { x: 0, z: .03, r: .07, agar: .0085 },
   RACK: { x: -.155, z: -.085 }, SCOPE: { x: .15, z: -.05, over: -2.65, park: -4.3 }, LAMP: { x: -.225, z: -.125 },
-  STACK: { x: -.19, z: .085 }, BIN: { x: .205, z: .1 }, CARD: { x: -.105, z: .135 }, LID: { x: .085, z: -.085 },
+  STACK: { x: -.19, z: .085 }, BIN: { x: .38, z: -.05, r: .09, h: .21 }, CARD: { x: .175, z: .118 },
   PINCH: { on: .02, gap: .02, cap: .035 }, HOVER: { on: .06, off: .09 }, // thumb-to-index metres; hysteresis after Meta's grab spec, a little looser for raw joints
   DROPS: 8, STEP_TIMEOUT: 10, DIM: .3,
   ROUNDS: [3, 4, 4, 5, 5, 6, 6], // sequence length per round; a success in round n brings stage n+1
@@ -154,7 +154,7 @@ const envTex = canvasTex(1024, 512, (g, w, h) => {
   let gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#9b8f78'); gr.addColorStop(.36, '#62574a'); gr.addColorStop(.5, '#3d342a'); gr.addColorStop(.54, '#2b241d'); gr.addColorStop(1, '#120e0a'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
   g.fillStyle = '#d9cdb4'; for (let i = 0; i < 4; i++) { g.globalAlpha = .55; g.fillRect(w * (.3 + i * .13), h * .05, w * .07, h * .035); } g.globalAlpha = 1; // ceiling fixtures
   g.fillStyle = '#c4dce6'; g.fillRect(w * .1, h * .2, w * .2, h * .22); g.fillStyle = '#4a4035'; for (let i = 1; i < 4; i++) g.fillRect(w * (.1 + i * .05) - 3, h * .2, 6, h * .22); g.fillRect(w * .1, h * .305, w * .2, 5); // the window and its mullions
-  const lg = g.createRadialGradient(w * .63, h * .2, 0, w * .63, h * .2, h * .16); lg.addColorStop(0, '#fff8ea'); lg.addColorStop(.15, '#ffe2b0'); lg.addColorStop(1, 'rgba(255,200,130,0)'); g.fillStyle = lg; g.fillRect(0, 0, w, h); // the lamp
+  const lg = g.createRadialGradient(w * .63, h * .2, 0, w * .63, h * .2, h * .09); lg.addColorStop(0, '#fff8ea'); lg.addColorStop(.12, '#ffe2b0'); lg.addColorStop(.4, 'rgba(255,214,160,.35)'); lg.addColorStop(1, 'rgba(255,200,130,0)'); g.fillStyle = lg; g.fillRect(0, 0, w, h); // the lamp
   g.fillStyle = '#1d1712'; for (let i = 0; i < 3; i++) g.fillRect(w * (.36 + i * .006), h * (.4 + i * .06), w * .2, h * .012); // shelves
   speckle(g, w, h * .5, 40, ['#efe6cf', '#9dc8b3'], 2, 5, .35);
 });
@@ -311,20 +311,26 @@ const lidGeo = lathe([[0, .0175], [DR + .0028, .0175], [DR + .0036, .0165], [DR 
 const meniscus = r => CFG.DISH.agar + .0022 * Math.pow(clamp((r - (DR - .012)) / .0104, 0, 1), 2.2);
 const agarGeo = (() => { const g = new THREE.RingGeometry(.0002, DR - .0016, 96, 14); g.rotateX(-Math.PI / 2); const p = g.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, meniscus(Math.hypot(p.getX(i), p.getZ(i)))); g.computeVertexNormals(); return g; })();
 const agarSideGeo = new THREE.CylinderGeometry(DR - .0017, DR - .0017, CFG.DISH.agar - .0024 + .002, 72, 1, true).translate(0, (CFG.DISH.agar + .0024 + .002) / 2, 0);
-const plainAgar = std(PAL.honey, .22, 0, { emissive: new C(PAL.amber), emissiveIntensity: .25 });
-function closedDish(parent) { const g = grp(parent); glassMesh(dishGeo, g, { a: .5, env: .6 }); glassMesh(lidGeo, g, { a: .5, env: .6 }, 22); mesh(agarGeo, plainAgar, g, { cast: false }); mesh(agarSideGeo, plainAgar, g, { cast: false }); return g; }
+const plainAgar = std(PAL.honey, .6, 0, { emissive: new C(PAL.amber), emissiveIntensity: .12 });
+function closedDish(parent) { const g = grp(parent); glassMesh(dishGeo, g, { a: .3, env: .16 }); glassMesh(lidGeo, g, { a: .45, env: .22 }, 22); mesh(agarGeo, plainAgar, g, { cast: false }); mesh(agarSideGeo, plainAgar, g, { cast: false }); return g; }
 const dishG = grp(lab, CFG.DISH.x, 0, CFG.DISH.z); PROPS.push([dishG, .25]);
 glassMesh(dishGeo, dishG);
-const lidG = grp(lab, CFG.LID.x, 0, CFG.LID.z); PROPS.push([lidG, .7]); { const l = glassMesh(lidGeo, lidG, {}, 22); lidG.rotation.z = Math.PI; lidG.position.y = .0177; }
+// (the open dish's lid is simply gone: a spare lid on the tray read as clutter)
 const stackG = grp(lab, CFG.STACK.x, 0, CFG.STACK.z); PROPS.push([stackG, .85]);
 const stack = [0, 1, 2].map(i => { const d = closedDish(stackG); d.position.y = i * .0178; d.rotation.y = i * .7; return d; });
-const binG = grp(lab, CFG.BIN.x, 0, CFG.BIN.z); PROPS.push([binG, 1]);
-{ mesh(lathe([[0, 0], [.034, 0], [.036, .004], [.036, .066], [.0365, .068], [0, .068]], 40), M.enamelCream, binG);
-  mesh(new THREE.TorusGeometry(.0362, .0016, 8, 40), M.chrome, binG, { p: [0, .068, 0], r: [Math.PI / 2, 0, 0] });
-  const lid = grp(binG, 0, .069, -.036); mesh(lathe([[0, .006], [.03, .004], [.0375, .0], [0, 0]], 40), M.enamelCream, lid, { p: [0, 0, .036] }); mesh(new THREE.SphereGeometry(.004, 12, 8), M.bakelite, lid, { p: [0, .007, .036] });
-  mesh(new THREE.BoxGeometry(.018, .004, .016), M.chrome, binG, { p: [0, .004, .042] }); binG.userData.lid = lid;
-  const dec = canvasTex(256, 64, (g, w, h) => { g.fillStyle = PAL.labgreen; g.font = '500 30px Jost'; g.textAlign = 'center'; g.fillText('DISCARD', w / 2, 42); });
-  mesh(new THREE.CylinderGeometry(.0362, .0362, .012, 24, 1, true, -.7, 1.4), new THREE.MeshStandardMaterial({ map: dec, transparent: true, roughness: .4 }), binG, { p: [0, .04, 0], cast: false }); }
+// a real lab pedal bin, standing on the desk to the right of the tray: big enough to take a dead dish with room to spare
+const binG = grp(lab, CFG.BIN.x, -CFG.TRAY.base, CFG.BIN.z); PROPS.push([binG, 1]);
+{ const R = CFG.BIN.r, H = CFG.BIN.h;
+  mesh(lathe([[0, .006], [R - .006, .006], [R - .004, .002], [R, .012], [R + .002, H - .012], [R + .004, H - .004], [R + .004, H], [R - .004, H], [R - .004, .014], [0, .014]], 56), M.enamelCream, binG);
+  mesh(new THREE.TorusGeometry(R + .0035, .0035, 10, 56), M.chrome, binG, { p: [0, H, 0], r: [Math.PI / 2, 0, 0] });
+  mesh(new THREE.TorusGeometry(R + .0005, .004, 10, 56), M.bakeliteBlack, binG, { p: [0, .006, 0], r: [Math.PI / 2, 0, 0] });
+  const lid = grp(binG, 0, H + .002, -R - .002); mesh(lathe([[0, .022], [R * .45, .02], [R * .85, .011], [R + .006, .002], [R + .006, 0], [0, 0]], 56), M.enamelCream, lid, { p: [0, 0, R + .002] }); mesh(new THREE.TorusGeometry(R + .005, .0025, 8, 56), M.chrome, lid, { p: [0, .001, R + .002], r: [Math.PI / 2, 0, 0] });
+  mesh(new THREE.CylinderGeometry(.008, .008, .03, 16), M.chrome, lid, { p: [0, .002, 0], r: [0, 0, Math.PI / 2] });
+  const pedal = grp(binG, 0, .02, R - .01); mesh(new THREE.BoxGeometry(.07, .006, .05), M.chrome, pedal, { p: [0, 0, .03] }); mesh(new THREE.BoxGeometry(.06, .002, .03), M.bakeliteBlack, pedal, { p: [0, .004, .035], cast: false });
+  binG.userData.lid = lid; binG.userData.pedal = pedal;
+  const dec = canvasTex(512, 160, (g, w, h) => { g.fillStyle = PAL.labgreen; g.fillRect(0, 34, w, 4); g.fillRect(0, 124, w, 4); g.font = '500 64px Jost'; g.textAlign = 'center'; g.fillText('DISCARD', w / 2, 104); g.font = '400 18px Oswald'; g.fillText('CULTURES  ·  GLASS  ·  REGRETS', w / 2, 152); });
+  mesh(new THREE.CylinderGeometry(R + .0025, R + .0035, .07, 40, 1, true, -.8, 1.6), new THREE.MeshStandardMaterial({ map: dec, transparent: true, roughness: .4 }), binG, { p: [0, H * .58, 0], cast: false });
+  const sh = new THREE.Mesh(new THREE.CircleGeometry(R * 1.5, 40).rotateX(-Math.PI / 2), deskShade.material); sh.position.y = .0007; binG.add(sh); }
 
 // the agar: a lit gel with the colony field, the stains, death, and the dish's flashes. Its own shader.
 const FN = 128; // colony grid
@@ -345,8 +351,8 @@ const agarMat = new THREE.ShaderMaterial({ uniforms: AG,
       vec3 base=mix(uHoney,uAmber,smoothstep(.45,1.,r)*.55+fbm(vL.xz*90.)*.12);
       vec3 pig=uSG*F.g+uSR*F.b+uSY*F.a;float pw=clamp(F.g+F.b+F.a,0.,1.);vec3 pc=pig/max(F.g+F.b+F.a,.001);
       base=mix(base,base*.4+pc*.75,pw*.7);
-      vec3 light=uLampC*wrap*att*3.4+.32;vec3 col=base*light+base*(.22+uWarm*.5);
-      float v=F.r*uColony;if(v>.02){vec3 cc=mix(vec3(.97,.93,.82),pc,min(pw*1.5,.75));float ring=.84+.16*sin(v*30.+fbm(vL.xz*300.)*3.);
+      vec3 light=uLampC*wrap*att*2.3+.26;vec3 col=base*light+base*(.14+uWarm*.5);
+      float v=F.r*uColony;if(v>.02){vec3 cc=mix(mix(vec3(.95,.88,.7),uHoney,.25),pc,min(pw*1.5,.75));float ring=.84+.16*sin(v*30.+fbm(vL.xz*300.)*3.);
         col=mix(col,cc*light*ring+cc*(.12+uLife*.5)*(.6+.4*sin(uT*1.3+v*20.)),smoothstep(.06,.4,v));}
       col+=pc*pw*.42;
       float dd=deadMask(vL.xz);if(dd>0.){float n=fbm(vL.xz*700.),fz=vn(vL.xz*2600.);vec3 m=mix(uSoot,uMould,n)*(light*.7);m=mix(m,uFuzz*light,smoothstep(.62,.95,fz)*.7);col=mix(col,m,dd);}
@@ -377,7 +383,7 @@ const SLOT_X = [-.045, 0, .045], BOTTLE_TOP = .052, PIP_LEN = .105, PIP_REST_Y =
   for (const x of SLOT_X) mesh(new THREE.TorusGeometry(.0058, .0012, 8, 20), M.chrome, rackG, { p: [x, .0885, -.004], r: [Math.PI / 2, 0, 0] }); }
 const bottleGeo = lathe([[0, 0], [.0155, 0], [.0168, .003], [.017, .03], [.0145, .038], [.0075, .044], [.0072, .05], [.0082, .052], [.0082, BOTTLE_TOP], [.0065, BOTTLE_TOP], [.0065, .046], [0, .046]], 40);
 const bottleLiqGeo = lathe([[0, .0015], [.0148, .0015], [.0158, .004], [.0158, .028], [0, .028]], 36);
-STAINS.forEach((st, i) => { const b = grp(rackG, SLOT_X[i], .016, .006); mesh(bottleLiqGeo, liquidMat(st.c, .55), b, { cast: false }); glassMesh(bottleGeo, b, { tint: '#d6d2b8' });
+STAINS.forEach((st, i) => { const b = grp(rackG, SLOT_X[i], .016, .006); st.bl = liquidMat(st.c, .55); st.pulse = 0; mesh(bottleLiqGeo, st.bl, b, { cast: false }); glassMesh(bottleGeo, b, { tint: '#d6d2b8' });
   const lt = bottleLabel(st); mesh(new THREE.CylinderGeometry(.0173, .0173, .019, 24, 1, true, -.75, 1.5), new THREE.MeshStandardMaterial({ map: lt, roughness: .7 }), b, { p: [0, .016, 0], cast: false });
   st.bottle = b; });
 
@@ -400,7 +406,7 @@ const PIPS = STAINS.map((st, i) => {
   return { i, st, g, col, men, bulb, bead, state: 'rack', hand: null, fill: CFG.DROPS, squash: 0, hover: 0, tip: new V(), tipPrev: new V(), anchor: new V(), ret: 0, retFrom: new V(), retQ: new Qn(), left: false, lost: 0, beadT: -1, glint: 0, slot: new V() };
 });
 function slotPos(p, out) { return out.set(CFG.RACK.x + SLOT_X[p.i], PIP_REST_Y, CFG.RACK.z + .006); }
-function setFill(p) { const h = .045 * clamp(p.fill / CFG.DROPS, 0, 1) + .0005; p.col.scale.y = h; p.men.position.y = -.07 + h; }
+function setFill(p) { const h = .045 * clamp((p.fv ?? p.fill) / CFG.DROPS, 0, 1) + .0005; p.col.scale.y = h; p.men.position.y = -.07 + h; }
 
 // --- the microscope: black crinkle enamel, chrome, a Bakelite focus knob, on a swing arm so it can come over the dish
 const scopeG = grp(lab, CFG.SCOPE.x, 0, CFG.SCOPE.z); PROPS.push([scopeG, .6]);
@@ -435,7 +441,11 @@ const SC = { theta: CFG.SCOPE.park, tgt: CFG.SCOPE.park, vel: 0, drag: null, arm
 // --- the procedure card, typed, in a little brass holder: the only words in the room
 const cardCv = document.createElement('canvas'); cardCv.width = 640; cardCv.height = 400; const cardTex = new THREE.CanvasTexture(cardCv); cardTex.encoding = THREE.sRGBEncoding; cardTex.anisotropy = 8;
 const cardG = grp(lab, CFG.CARD.x, 0, CFG.CARD.z); PROPS.push([cardG, .9]);
-{ mesh(new THREE.BoxGeometry(.05, .004, .012), M.brass, cardG, { p: [0, .002, 0] }); const c = mesh(new THREE.PlaneGeometry(.096, .06), new THREE.MeshStandardMaterial({ map: cardTex, roughness: .8, side: THREE.DoubleSide }), cardG, { p: [0, .033, -.004], r: [-.32, 0, 0] }); mesh(new THREE.BoxGeometry(.044, .012, .002), M.brass, cardG, { p: [0, .007, .002], r: [-.32, 0, 0] }); cardG.rotation.y = .32; }
+const cardBack = canvasTex(640, 400, (g, w, h) => { g.fillStyle = PAL.paper; g.fillRect(0, 0, w, h); speckle(g, w, h, 160, ['#e2d6b8', '#fffaf0'], 2, 10, .25); g.fillStyle = PAL.ink; g.textAlign = 'center'; g.font = '500 30px Jost'; g.fillText('PROPERTY OF THE', w / 2, 92); g.fillText('DEPARTMENT OF BIOLOGY', w / 2, 132); g.fillStyle = PAL.rule; g.fillRect(170, 156, 300, 3);
+  g.fillStyle = PAL.ink; g.font = '400 27px "Courier Prime"'; ['Do not tap on the glass.', 'Do not name the culture.', 'Do not let it see you cry.'].forEach((l, k) => g.fillText(l, w / 2, 222 + k * 44)); g.font = 'italic 400 22px "Courier Prime"'; g.fillStyle = '#7a6f5e'; g.fillText('(see other side)', w / 2, 370); });
+{ mesh(new THREE.BoxGeometry(.06, .005, .014), M.brass, cardG, { p: [0, .0025, 0] }); const flip = cardG.userData.flip = grp(cardG, 0, .008, -.002); flip.rotation.x = -.32;
+  mesh(new THREE.PlaneGeometry(.127, .079), new THREE.MeshStandardMaterial({ map: cardTex, roughness: .8 }), flip, { p: [0, .0395, 0] }); mesh(new THREE.PlaneGeometry(.127, .079), new THREE.MeshStandardMaterial({ map: cardBack, roughness: .8 }), flip, { p: [0, .0395, -.0004], r: [0, Math.PI, 0] });
+  mesh(new THREE.BoxGeometry(.056, .013, .002), M.brass, cardG, { p: [0, .009, .003], r: [-.32, 0, 0] }); cardG.rotation.y = -.42; }
 let cardKey = '';
 function card(head, lines) {
   const key = head + lines.join('|'); if (key === cardKey) return; cardKey = key; const g = cardCv.getContext('2d'), w = cardCv.width, h = cardCv.height;
@@ -486,7 +496,8 @@ function updHands(dt) {
 // ═══════════════════════════ PIPETTES: sticky pick, pinch to squeeze ═══════════════════════════
 // Pinch near a dropper and it jumps to your hand and stays there. Every pinch after that is one drop. Bring its tip back to its bottle to put it down (and refill it).
 const G = 9.81;
-function pipHome(p) { slotPos(p, p.g.position); p.g.quaternion.identity(); p.state = 'rack'; p.hand = null; p.fill = CFG.DROPS; setFill(p); p.tip.copy(p.g.position).y -= PIP_LEN; p.tipPrev.copy(p.tip); }
+function buzz(h, v, ms) { try { const a = h && h.src && h.src.gamepad && h.src.gamepad.hapticActuators; if (a && a[0]) a[0].pulse(v, ms); } catch (e) { } }
+function pipHome(p) { slotPos(p, p.g.position); p.g.quaternion.identity(); p.state = 'rack'; p.hand = null; p.fill = CFG.DROPS; p.tip.copy(p.g.position).y -= PIP_LEN; p.tipPrev.copy(p.tip); }
 function updPipettes(dt) {
   for (const h of PH) {
     if (!h.tracked) continue;
@@ -494,7 +505,7 @@ function updPipettes(dt) {
       if (h.hold) squeeze(h.hold);
       else {
         let best = null, bd = CFG.HOVER.on; for (const p of PIPS) if (p.state === 'rack' || p.state === 'return') { const dd = p.g.position.distanceTo(h.P) - (p.hover > .5 ? .015 : 0); if (dd < bd) { bd = dd; best = p; } }
-        if (best) { best.state = 'held'; best.hand = h; h.hold = best; best.left = false; best.lost = 0; best.snap = 0; best.snapFrom = best.g.position.clone(); best.tip.copy(best.g.position).y -= PIP_LEN; best.tipPrev.copy(best.tip); sfx('pick', best.g.position); }
+        if (best) { best.state = 'held'; best.hand = h; h.hold = best; best.left = false; best.lost = 0; best.snap = 0; best.snapFrom = best.g.position.clone(); best.tip.copy(best.g.position).y -= PIP_LEN; best.tipPrev.copy(best.tip); best.pop = 1; best.glint = 1; sfx('pick', best.g.position); buzz(h, .5, 40); }
         else if (scopeHandle(h)) { SC.drag = h; sfx('tick', h.P); }
       }
     }
@@ -503,7 +514,7 @@ function updPipettes(dt) {
   for (const p of PIPS) {
     if (p.state === 'rack') { slotPos(p, _v); p.g.position.lerp(_v, damp(dt, .06)); p.g.quaternion.slerp(_q.identity(), damp(dt, .08)); p.tip.copy(p.g.position).y -= PIP_LEN; p.tipPrev.copy(p.tip);
       let near = 9; for (const h of PH) if (h.tracked && !h.hold) near = Math.min(near, p.g.position.distanceTo(h.P));
-      p.hover = lerp(p.hover, near < (p.hover > .5 ? CFG.HOVER.off : CFG.HOVER.on) ? 1 : 0, damp(dt, .06)); p.g.position.y += p.hover * .004; }
+      const hv = near < (p.hover > .5 ? CFG.HOVER.off : CFG.HOVER.on) ? 1 : 0; if (hv && !p.hov) { sfx('hover', p.g.position); p.glint = Math.max(p.glint, .8); } p.hov = hv; p.hover = lerp(p.hover, hv, damp(dt, .06)); p.g.position.y += p.hover * .005; }
     else if (p.state === 'held') {
       const h = p.hand; if (!h.tracked) { p.lost += 0; } p.lost = h.tracked ? 0 : p.lost + dt;
       if (p.lost > 2) { goHome(p); continue; }
@@ -514,22 +525,26 @@ function updPipettes(dt) {
       p.tip.lerp(_v.copy(p.g.position).setY(p.g.position.y - PIP_LEN), damp(dt, .09)); _v.subVectors(p.tip, p.g.position).setLength(PIP_LEN); p.tip.copy(p.g.position).add(_v); // settles back to hanging straight
       _v.subVectors(p.tip, p.g.position).normalize(); p.g.quaternion.setFromUnitVectors(_v2.set(0, -1, 0), _v);
       // the bulb follows your fingers between squeezes
-      const open = clamp((h.d - .012) / .04, 0, 1); p.squash = Math.max(p.squash - dt * 4, (1 - open) * .55);
+      const open = clamp((h.d - .012) / .04, 0, 1); p.sqT = (1 - open) * .45;
       // back to its own bottle: dock
       slotPos(p, _v); _v.y = BOTTLE_TOP + .016; const dTip = Math.hypot(p.tip.x - _v.x, p.tip.z - _v.z);
       if (!p.left && (dTip > .05 || p.tip.y > _v.y + .05)) p.left = true;
       if (p.left && dTip < .024 && p.tip.y < _v.y + .015) { dock(p); continue; }
     }
     else if (p.state === 'return') { p.ret = Math.min(1, p.ret + dt / .45); slotPos(p, _v); p.g.position.lerpVectors(p.retFrom, _v, s01(p.ret)); p.g.position.y += Math.sin(p.ret * Math.PI) * .05; p.g.quaternion.slerpQuaternions(p.retQ, _q.identity(), s01(p.ret)); if (p.ret >= 1) { pipHome(p); sfx('clink', p.g.position); } }
+    if (p.state !== 'held') p.sqT = 0; p.sqV = (p.sqV || 0) + ((p.sqT || 0) - p.squash) * 900 * dt; p.sqV *= Math.exp(-dt * 22); p.squash += p.sqV * dt; // a springy rubber bulb
+    p.pop = Math.max(0, (p.pop || 0) - dt * 4); p.g.scale.setScalar(1 + Math.sin(p.pop * Math.PI) * .07);
+    p.fv = lerp(p.fv ?? p.fill, p.fill, damp(dt, p.fill > p.fv ? .25 : .05)); setFill(p);
+    p.glint = Math.max(0, (p.glint || 0) - dt * 1.6); if (p.glint > 0) { const y = lerp(-PIP_LEN + .01, -.015, 1 - p.glint); _v.set(.0046, y, 0).applyQuaternion(p.g.quaternion).add(p.g.position); glow.add(_v.x, _v.y, _v.z, .006, 1, .95, .85, Math.sin(p.glint * Math.PI) * .7, 2, .4); }
     p.bulb.scale.set(1 + p.squash * .3, 1 - p.squash * .34, 1 + p.squash * .3); p.bulb.position.y = -p.squash * .002;
     if (p.beadT >= 0) { p.beadT += dt; const k = p.beadT / .14; p.bead.visible = true; p.bead.scale.setScalar(.0006 + .0012 * Math.min(k, 1)); p.bead.position.y = -PIP_LEN - .0012 - .0008 * k; if (k >= 1) { p.beadT = -1; p.bead.visible = false; releaseDrop(p); } }
   }
 }
 function squeeze(p) {
-  p.squash = 1; if (p.fill <= 0) { sfx('puff', p.g.position); return; } if (p.beadT >= 0) return;
-  p.fill--; setFill(p); p.beadT = 0; sfx('squeeze', p.g.position);
+  if (p.fill <= 0) { p.sqV = -5; sfx('puff', p.g.position); return; } if (p.beadT >= 0) return;
+  p.fill--; p.beadT = 0; p.sqV = -6; sfx('squeeze', p.g.position); buzz(p.hand, .3, 25);
 }
-function dock(p) { p.state = 'return'; p.ret = .6; p.retFrom.copy(p.g.position); p.retQ.copy(p.g.quaternion); if (p.hand) p.hand.hold = null; p.hand = null; sfx('dip', p.g.position); }
+function dock(p) { buzz(p.hand, .4, 30); p.state = 'return'; p.ret = .6; p.retFrom.copy(p.g.position); p.retQ.copy(p.g.quaternion); if (p.hand) p.hand.hold = null; p.hand = null; sfx('dip', p.g.position); if (p.fill < CFG.DROPS) setTimeout(() => sfx('gurgle', p.g.position), 250); p.st.pulse = .8; }
 function goHome(p) { p.state = 'return'; p.ret = 0; p.retFrom.copy(p.g.position); p.retQ.copy(p.g.quaternion); if (p.hand) p.hand.hold = null; p.hand = null; }
 
 // ═══════════════════════════ DROPS: bead, neck, fall, splash, bloom ═══════════════════════════
@@ -601,8 +616,9 @@ function colonyPoint(rmax = .055) { for (let k = 0; k < 30; k++) { const [x, z] 
 function gelMat(col, glowK) { const m = std(col, .32, 0, { envMapIntensity: .9 }); m.onBeforeCompile = sh => { sh.uniforms.uGlow = { value: glowK }; m.userData.u = sh.uniforms; sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uGlow;').replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n#if defined(USE_INSTANCING_COLOR)\ntotalEmissiveRadiance+=vColor*uGlow;\n#endif'); }; return m; }
 const KIT = {
   dome: new THREE.InstancedMesh(new THREE.SphereGeometry(1, 20, 10, 0, 6.283, 0, Math.PI / 2), gelMat('#f6ecd6', .35), 40),
-  spire: new THREE.InstancedMesh(mergeBufferGeometries([new THREE.CylinderGeometry(.18, .32, 1, 10).translate(0, .5, 0), new THREE.SphereGeometry(.34, 12, 8).translate(0, 1.05, 0)]), gelMat('#f6ecd6', .5), 24),
+  spire: new THREE.InstancedMesh(mergeBufferGeometries([new THREE.CylinderGeometry(.1, .3, 1, 10).translate(0, .5, 0), new THREE.SphereGeometry(.4, 12, 8).scale(1, .3, 1).translate(0, 1.04, 0), new THREE.CylinderGeometry(.45, .45, .04, 14).translate(0, .62, 0)]), gelMat('#f6ecd6', .5), 24),
   arch: new THREE.InstancedMesh(new THREE.TorusGeometry(1, .14, 8, 20, Math.PI), gelMat('#f2e6cc', .3), 16),
+  pod: new THREE.InstancedMesh(mergeBufferGeometries([new THREE.CylinderGeometry(.4, .46, .4, 16).translate(0, .2, 0), new THREE.SphereGeometry(.4, 16, 8, 0, 6.283, 0, Math.PI / 2).scale(1, .6, 1).translate(0, .4, 0)]), gelMat('#f4ead2', .25), 20),
   roof: new THREE.InstancedMesh(mergeBufferGeometries([new THREE.BoxGeometry(1, .06, .5).translate(.45, 0, 0).rotateZ(.22), new THREE.BoxGeometry(1, .06, .5).translate(-.45, 0, 0).rotateZ(-.22), new THREE.CylinderGeometry(.04, .04, .7, 6).translate(.55, -.35, 0), new THREE.CylinderGeometry(.04, .04, .7, 6).translate(-.55, -.35, 0)]).translate(0, .7, 0), gelMat(PAL.cream, .2), 20),
 };
 for (const k in KIT) { const m = KIT[k]; m.count = 0; m.castShadow = true; m.receiveShadow = true; m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(m.instanceMatrix.count * 3), 3); lifeG.add(m); }
@@ -633,7 +649,7 @@ function buildStage(s) { // lay out what belongs to stage s (called once when it
     for (let i = 0; i < 6; i++) { const [x, z] = dishPoint(.05); L.spires.push({ x, z, h: rand(.012, .02), lin: lineage(), born: T + rand(1, 5), star: true }); } }
 }
 function newBeing(size) { const [x, z] = dishPoint(.05, .02); return { x, z, vx: 0, vz: 0, yaw: Math.random() * 6, size, sz: 0, ph: Math.random() * 7, lin: lineage(), jump: 0, jv: 0, wx: x, wz: z, wt: 0, flee: 0, born: T + Math.random() * 3, lean: 0, sway: 0, look: 0 }; }
-function lifeReset() { for (const k in L) L[k].length = 0; for (const k in KIT) KIT[k].count = 0; BODY.count = CREST.count = 0; monG.visible = false; S.colonyBoot = false; }
+function lifeReset() { for (const k in L) L[k].length = 0; for (const k in KIT) KIT[k].count = 0; BODY.count = CREST.count = 0; monG.visible = false; S.colonyBoot = false; if (typeof ARM !== "undefined") ARM.count = 0; }
 const _o = new THREE.Object3D(), _c = new C();
 function updLife(dt) {
   const st = S.stage, inMicro = SC.view > .01 || SIM;
@@ -650,138 +666,192 @@ function updLife(dt) {
   L.cells.forEach((c, i) => { if (i >= nc || T < c.born) return; c.vx += (Math.random() - .5) * dt * .0004; c.vz += (Math.random() - .5) * dt * .0004; c.vx *= .96; c.vz *= .96; c.x += c.vx * dt * 10; c.z += c.vz * dt * 10; c.rot += dt * .2 * Math.sin(c.ph);
     c.divT -= dt; if (c.divT < 0 && c.div === 0) c.div = .001; if (c.div > 0) { c.div += dt / 3.5; if (c.div >= 1) { c.div = 0; c.divT = rand(5, 16); const j = (i + 1 + (Math.random() * 30 | 0)) % L.cells.length, o = L.cells[j]; o.x = c.x + Math.cos(c.rot) * c.r * 2.4; o.z = c.z + Math.sin(c.rot) * c.r * 2.4; o.born = T; } }
     const k = s01((T - c.born) / 1.5) * (deadAt(c.x, c.z) ? .15 : 1), dv = c.div > 0 ? Math.sin(c.div * Math.PI * .5) : 0;
-    if (inMicro) micro.add(ox + c.x, oy + .0004, oz + c.z, c.r * (1 + dv * .5) * k, c.c.r, c.c.g, c.c.b, k * .95, 0, c.rot, dv);
-    if (i % 3 === 0) glow.add(ox + c.x, oy + .0005, oz + c.z, .0009, 1, .93, .8, k * .25 * (st >= 4 ? .4 : 1)); });
+    if (inMicro) micro.add(ox + c.x, oy + .0004, oz + c.z, c.r * 2.4 * (1 + dv * .5) * k, c.c.r, c.c.g, c.c.b, k * .95, 0, c.rot, dv);
+    if (i % 2 === 0) glow.add(ox + c.x, oy + .0005, oz + c.z, .0013, 1, .93, .8, k * (.3 + .15 * Math.sin(T * 3 + c.ph)) * (st >= 4 ? .4 : 1)); });
   // structures
   const grow = (born, dur = 2.5) => outBack((T - born) / dur);
-  let n = 0; for (const d of L.domes) { const g = grow(d.born); if (g <= 0) continue; _o.position.set(d.x, 0, d.z); _o.rotation.set(0, 0, 0); _o.scale.set(d.r, d.r * (.75 + .1 * Math.sin(T + d.r * 900)), d.r).multiplyScalar(g * (deadAt(d.x, d.z) ? .6 : 1)); _o.updateMatrix(); KIT.dome.setMatrixAt(n, _o.matrix); KIT.dome.setColorAt(n, _c.copy(STAINS[d.lin].c).lerp(new C(PAL.cream), .55)); n++; } KIT.dome.count = n;
-  n = 0; for (const s of L.spires) { const g = grow(s.born, 3); if (g <= 0) continue; _o.position.set(s.x, 0, s.z); _o.rotation.set(0, 0, 0); _o.scale.set(s.h * .16, s.h * g, s.h * .16); _o.updateMatrix(); KIT.spire.setMatrixAt(n, _o.matrix); KIT.spire.setColorAt(n, _c.copy(STAINS[s.lin].c).lerp(new C(PAL.cream), .3)); n++;
+  let n = 0; for (const d of L.domes) { const g = grow(d.born); if (g <= 0) continue; _o.position.set(d.x, 0, d.z); _o.rotation.set(0, 0, 0); _o.scale.set(d.r, d.r * (1.05 + .06 * Math.sin(T + d.r * 900)), d.r).multiplyScalar(g * (deadAt(d.x, d.z) ? .6 : 1)); if (st >= 6 && g > .9) { const a = d.r * 4000; glow.add(ox + d.x + Math.cos(a) * d.r * .95, oy + d.r * .35, oz + d.z + Math.sin(a) * d.r * .95, d.r * .5, 1, .78, .42, .55 + .15 * Math.sin(T * 1.7 + a)); } _o.updateMatrix(); KIT.dome.setMatrixAt(n, _o.matrix); KIT.dome.setColorAt(n, _c.copy(STAINS[d.lin].c).lerp(new C(PAL.cream), .55)); n++; } KIT.dome.count = n;
+  n = 0; for (const s of L.spires) { const g = grow(s.born, 3); if (g <= 0) continue; _o.position.set(s.x, 0, s.z); _o.rotation.set(0, 0, 0); _o.scale.set(s.h * .3, s.h * g, s.h * .3); _o.updateMatrix(); KIT.spire.setMatrixAt(n, _o.matrix); KIT.spire.setColorAt(n, _c.copy(STAINS[s.lin].c).lerp(new C(PAL.cream), .3)); n++;
     if (s.star && g > .9) { const tp = _v.set(ox + s.x, oy + s.h * 1.06, oz + s.z); glow.addC(tp, .006, STAINS[s.lin].c, .55 + .25 * Math.sin(T * 3 + s.h * 500), 2, T * .3); glow.add(tp.x, tp.y, tp.z, .0012, 1, .96, .85, 1); } } KIT.spire.count = n;
   n = 0; for (const a of L.arches) { const g = grow(a.born, 3); if (g <= 0) continue; const mx = (a.a.x + a.b.x) / 2, mz = (a.a.z + a.b.z) / 2, half = Math.hypot(a.b.x - a.a.x, a.b.z - a.a.z) / 2; _o.position.set(mx, 0, mz); _o.rotation.set(0, -Math.atan2(a.b.z - a.a.z, a.b.x - a.a.x), 0); _o.scale.set(half, half * .8 * g, half * .5); _o.updateMatrix(); KIT.arch.setMatrixAt(n, _o.matrix); KIT.arch.setColorAt(n, _c.copy(STAINS[a.lin].c).lerp(new C(PAL.cream), .5)); n++; } KIT.arch.count = n;
-  n = 0; for (const r of L.roofs) { const g = grow(r.born, 2); if (g <= 0) continue; _o.position.set(r.x, 0, r.z); _o.rotation.set(0, r.ry, 0); _o.scale.setScalar(r.s * g); _o.updateMatrix(); KIT.roof.setMatrixAt(n, _o.matrix); KIT.roof.setColorAt(n, _c.copy(STAINS[r.lin].c).lerp(new C(PAL.cream), .45)); n++;
-    glow.add(ox + r.x, oy + r.s * .5, oz + r.z, r.s * 1.1, 1, .8, .5, .35 * g); } KIT.roof.count = n;
+  n = 0; for (const r of L.roofs) { const g = grow(r.born, 2); if (g <= 0) continue; _o.position.set(r.x, 0, r.z); _o.rotation.set(0, r.ry, 0); _o.scale.setScalar(r.s * g); _o.updateMatrix(); KIT.roof.setMatrixAt(n, _o.matrix); KIT.roof.setColorAt(n, _c.copy(STAINS[r.lin].c).lerp(new C(PAL.cream), .45)); KIT.pod.setMatrixAt(n, _o.matrix); KIT.pod.setColorAt(n, _c.copy(STAINS[r.lin].c).lerp(new C(PAL.cream), .75)); n++;
+    glow.add(ox + r.x, oy + r.s * .5, oz + r.z, r.s * 1.1, 1, .8, .5, .35 * g); } KIT.roof.count = KIT.pod.count = n;
   for (const k in KIT) { KIT[k].instanceMatrix.needsUpdate = true; if (KIT[k].instanceColor) KIT[k].instanceColor.needsUpdate = true; }
   updBeings(dt, deadAt);
   // rings where drops land
-  for (let i = RINGS.length - 1; i >= 0; i--) { const r = RINGS[i]; r.t += dt; if (r.t > 1.1) { RINGS.splice(i, 1); continue; } glow.add(ox + r.x, oy + .0006, oz + r.z, .004 + r.t * .02, r.c.r, r.c.g, r.c.b, (1 - r.t / 1.1) * .7, 1); }
+  for (let i = RINGS.length - 1; i >= 0; i--) { const r = RINGS[i]; r.t += dt; if (r.t > 1.1) { RINGS.splice(i, 1); continue; } if (r.big) glow.add(ox, oy + .0008, oz, .01 + r.t * .085, r.c.r, r.c.g, r.c.b, (1 - r.t / 1.1) * .9, 1); else glow.add(ox + r.x, oy + .0006, oz + r.z, .004 + r.t * .02, r.c.r, r.c.g, r.c.b, (1 - r.t / 1.1) * .7, 1); }
   // fireworks
-  for (let i = L.fire.length - 1; i >= 0; i--) { const f = L.fire[i]; f.t += dt; f.v.y -= (f.shell ? 1.2 : 2.2) * dt; f.v.multiplyScalar(f.shell ? 1 : .985); f.p.addScaledVector(f.v, dt);
-    if (f.shell && f.t > f.fuse) { L.fire.splice(i, 1); for (let k = 0; k < 22; k++) { const a = Math.random() * 6.283, e = Math.acos(rand(-1, 1)), s = rand(.05, .09); L.fire.push({ p: f.p.clone(), v: new V(Math.sin(e) * Math.cos(a) * s, Math.cos(e) * s + .02, Math.sin(e) * Math.sin(a) * s), c: f.c, t: 0, life: rand(.7, 1.1) }); } sfx('pop', f.p); continue; }
+  for (let i = L.fire.length - 1; i >= 0; i--) { const f = L.fire[i]; f.t += dt; if (f.t < 0) continue;
+    if (f.flash) { if (f.t > .25) L.fire.splice(i, 1); else glow.addC(f.p, .06, f.c, (1 - f.t / .25) * .35); continue; }
+    f.v.y -= (f.shell ? .9 : 1.6) * dt; f.v.multiplyScalar(f.shell ? 1 : Math.exp(-dt * 1.6)); f.p.addScaledVector(f.v, dt);
+    if (f.shell) { glow.addC(f.p, .006, f.c, .9, 0); glow.add(f.p.x, f.p.y, f.p.z, .0016, 1, .97, .9, 1); if (Math.random() < .6) L.fire.push({ p: f.p.clone(), v: new V(rand(-.005, .005), -.01, rand(-.005, .005)), c: f.c, t: 0, life: .35, ember: true }); }
+    if (f.shell && f.t > f.fuse) { L.fire.splice(i, 1); const n = 34, s0 = rand(.07, .11), c2 = Math.random() < .5 ? new C(PAL.spark) : f.c; for (let k = 0; k < n; k++) { const a = Math.random() * 6.283, e = Math.acos(rand(-1, 1)), s = s0 * rand(.85, 1); L.fire.push({ p: f.p.clone(), v: new V(Math.sin(e) * Math.cos(a) * s, Math.cos(e) * s + .015, Math.sin(e) * Math.sin(a) * s), c: k % 3 ? f.c : c2, t: 0, life: rand(.9, 1.4) }); } L.fire.push({ flash: true, p: f.p.clone(), c: f.c, t: 0 }); sfx('pop', f.p); continue; }
     if (!f.shell && f.t > f.life) { L.fire.splice(i, 1); continue; }
-    glow.addC(f.p, f.shell ? .0025 : .002, f.c, f.shell ? .9 : (1 - f.t / f.life) * (.7 + .3 * Math.sin(f.t * 40)), f.shell ? 0 : 3); }
-  // the monument rises
-  if (monG.visible) { const k = s01((T - S.monT) / 5); monG.position.y = lerp(-.04, 0, k); monG.scale.setScalar(lerp(.6, 1, k)); }
+    if (!f.shell) { const k = f.t / f.life; glow.addC(f.p, f.ember ? .0022 : .005 * (1 - k * .4), f.c, (1 - k) * (f.ember ? .5 : .75 + .25 * Math.sin(f.t * 45 + i)), f.ember ? 0 : k > .5 ? 2 : 3, f.t * 3); } }
+  // the monument rises out of the agar on a column of light
+  if (monG.visible) { const k = s01((T - S.monT) / 5); monG.position.y = lerp(-.05, 0, k); monG.scale.setScalar(lerp(.5, 1, k)); if (k > 0 && k < 1) for (let j = 0; j < 6; j++) glow.add(ox, oy + j * .012 * k, oz, .02 - j * .002, 1, .85, .55, .25 * Math.sin(k * Math.PI)); if (k >= 1) glow.add(ox, oy + .04, oz, .03, 1, .82, .5, .12 + .05 * Math.sin(T * 2)); }
 }
-function fireworks(n = 4, x = 0, z = 0) { for (let i = 0; i < n; i++) L.fire.push({ shell: true, p: new V(CFG.DISH.x + x + rand(-.03, .03), CFG.DISH.agar, CFG.DISH.z + z + rand(-.03, .03)), v: new V(rand(-.02, .02), rand(.22, .3), rand(-.02, .02)), c: STAINS[lineage()].c.clone().lerp(new C(PAL.spark), .3), t: 0, fuse: rand(.45, .7) }); }
-// the beings: they wander, follow your fingertip, scatter when it comes down fast, avoid the blight, and answer your voice
+function fireworks(n = 4, x = 0, z = 0) { for (let i = 0; i < n; i++) L.fire.push({ shell: true, p: new V(CFG.DISH.x + x + rand(-.03, .03), CFG.DISH.agar, CFG.DISH.z + z + rand(-.03, .03)), v: new V(rand(-.025, .025), rand(.36, .46), rand(-.025, .025)), c: STAINS[lineage()].c.clone().lerp(new C(PAL.spark), .25), t: -i * rand(.12, .25), fuse: rand(.42, .6) }); sfx('whoosh', null); }
+// the beings: little lives of their own (wander, look about, chat in pairs, wave at you, build), they gather under your fingertip and reach up to it,
+// scatter when it comes down fast, flee the blight, startle at a knock on the glass, and answer your voice (cheer, hum along, hush)
+const ARM = new THREE.InstancedMesh((() => { const g = mergeBufferGeometries([new THREE.CylinderGeometry(.06, .05, .3, 7).translate(0, -.15, 0), new THREE.SphereGeometry(.075, 8, 6).translate(0, -.32, 0)]); const n = g.attributes.position.count, c = new C(PAL.cream); g.setAttribute('color', new THREE.Float32BufferAttribute(new Array(n).fill(0).flatMap(() => [c.r, c.g, c.b]), 3)); return g; })(), BODY.material, 320);
+ARM.count = 0; ARM.castShadow = true; lifeG.add(ARM);
+const _ma = new THREE.Matrix4(), _ea = new THREE.Euler(), _vh = new V();
+let chirpT = 0; const say = (f, v) => { if (T - chirpT < .12) return; chirpT = T; chirp(f, v); };
+function pickAct(b, i, bs) {
+  const r = Math.random(), st = S.stage;
+  if (r < .35) { b.act = 'walk'; b.actT = rand(3, 7); }
+  else if (r < .55) { b.act = 'idle'; b.actT = rand(1.5, 4); }
+  else if (r < .75) { let best = null, bd = .02; for (const o of bs) { if (o === b || o.act === 'chat') continue; const d = Math.hypot(o.x - b.x, o.z - b.z); if (d < bd) { bd = d; best = o; } } if (best) { b.act = best.act = 'chat'; b.mate = best; best.mate = b; b.actT = best.actT = rand(3, 6); } else { b.act = 'idle'; b.actT = 2; } }
+  else if (r < .87) { b.act = 'wave'; b.actT = rand(1.6, 2.6); }
+  else if (st >= 4 && (L.domes.length || L.roofs.length)) { const t = pick(L.roofs.length && Math.random() < .5 ? L.roofs : L.domes); b.act = 'build'; b.site = t; b.actT = rand(5, 9); }
+  else { b.act = 'walk'; b.actT = rand(3, 6); }
+}
 function updBeings(dt, deadAt) {
-  const bs = L.beings; if (!bs.length) { BODY.count = CREST.count = 0; return; }
+  const bs = L.beings; if (!bs.length) { BODY.count = CREST.count = ARM.count = 0; return; }
   const big = S.stage >= 6, sp = big ? .016 : .007;
-  // your nearest fingertip, in dish space
   let hx = 0, hz = 0, hy = 9, hvy = 0; for (const h of PH) if (h.tracked) { const x = h.tip.x - CFG.DISH.x, z = h.tip.z - CFG.DISH.z, y = h.tip.y - CFG.DISH.agar; if (Math.hypot(x, z) < .1 && y < hy) { hx = x; hz = z; hy = y; hvy = h.tipVel.y; } }
-  const handNear = hy < .2, slam = handNear && hy < .07 && hvy < -.35;
+  const handNear = hy < .2 && S.phase !== 'recog', slam = handNear && hy < .07 && hvy < -.35;
   camera.getWorldPosition(_v3); toLab(_v3); const px = _v3.x - CFG.DISH.x, pz = _v3.z - CFG.DISH.z;
-  const loud = VO.loud, hum = VO.hum, hush = VO.hush, recog = S.phase === 'recog';
-  if (VO.onset > .5) for (const b of bs) { b.flee = .6 + Math.random() * .4; b.jv = Math.max(b.jv, rand(.12, .2)); }
-  let n = 0;
+  const loud = VO.loud, hum = VO.hum, hush = VO.hush, recog = S.phase === 'recog', knock = T - (S.knockT || -9) < 1.6;
+  if (VO.onset > .9) { VO.onset = .89; for (const b of bs) { b.flee = .5 + Math.random() * .4; b.jv = Math.max(b.jv, rand(.12, .2)); b.act = 'startle'; b.actT = 1.6; } say(3200, .05); }
+  let n = 0, na = 0;
   for (let i = 0; i < bs.length; i++) { const b = bs[i]; if (T < b.born) continue;
-    b.sz = Math.min(1, b.sz + dt * .8); let tx = b.wx, tz = b.wz, speed = sp * .5, face = null;
-    b.wt -= dt; if (b.wt < 0) { const [x, z] = dishPoint(.055); b.wx = x; b.wz = z; b.wt = rand(3, 8); }
-    if (recog) { const a = i / bs.length * 6.283 * 3, rr = .016 + (i % 3) * .009; tx = Math.cos(a) * rr; tz = Math.sin(a) * rr; speed = sp; face = [0, 0]; }
-    else if (handNear && b.flee <= 0) { const dx = b.x - hx, dz = b.z - hz, d = Math.hypot(dx, dz) + 1e-5, ring = .01 + (i % 4) * .004 + (big ? .004 : 0); tx = hx + dx / d * ring; tz = hz + dz / d * ring; speed = sp; face = [hx, hz]; }
-    if (slam && Math.hypot(b.x - hx, b.z - hz) < .045) b.flee = .8;
-    if (deadAt(b.x, b.z)) { const dv = AG.uDead.value; tx = b.x + (b.x - dv.x) * 3; tz = b.z + (b.z - dv.y) * 3; speed = sp * 1.5; b.flee = Math.max(b.flee, .3); }
+    if (!b.act) pickAct(b, i, bs); b.actT -= dt; if (b.actT <= 0) { if (b.act === 'chat' && b.mate) { b.mate.act = null; b.mate = null; } pickAct(b, i, bs); }
+    b.sz = Math.min(1, b.sz + dt * .8); let tx = b.x, tz = b.z, speed = sp * .5, face = null, act = b.act;
+    if (act === 'walk') { b.wt -= dt; if (b.wt < 0 || Math.hypot(b.wx - b.x, b.wz - b.z) < .004) { const [x, z] = dishPoint(.055); b.wx = x; b.wz = z; b.wt = rand(3, 8); } tx = b.wx; tz = b.wz; }
+    else if (act === 'idle') face = [b.x + Math.sin(T * .7 + b.ph) * .01, b.z + Math.cos(T * .5 + b.ph) * .01];
+    else if (act === 'chat' && b.mate) { const m = b.mate, d = Math.hypot(m.x - b.x, m.z - b.z); if (d > b.size * 1.6) { tx = m.x; tz = m.z; } face = [m.x, m.z]; if (Math.random() < dt * .5 && big) say(rand(2600, 3400), .015); }
+    else if (act === 'wave') face = [px, pz];
+    else if (act === 'build' && b.site) { const d = Math.hypot(b.site.x - b.x, b.site.z - b.z); if (d > b.size * 1.4) { tx = b.site.x; tz = b.site.z; speed = sp * .7; } else { face = [b.site.x, b.site.z]; if (Math.sin(T * 9 + b.ph) > .97 && big) { glow.add(CFG.DISH.x + b.x + (b.site.x - b.x) * .5, CFG.DISH.agar + b.size * .5, CFG.DISH.z + b.z + (b.site.z - b.z) * .5, b.size * .4, 1, .9, .6, .7, 2); } } }
+    if (recog) { act = S.t < 4 ? 'look' : S.t > 8 ? 'cheer' : 'gather'; const a = i / bs.length * 6.283 * 3, rr = .02 + (i % 3) * .009; if (S.t > 3) { tx = Math.cos(a) * rr; tz = Math.sin(a) * rr; speed = sp; } face = S.t > 4 && S.t < 8 ? [0, 0] : [px, pz]; }
+    else if (handNear && b.flee <= 0 && act !== 'panic') { const dx = b.x - hx, dz = b.z - hz, d = Math.hypot(dx, dz) + 1e-5, ring = .009 + (i % 4) * .004 + (big ? .004 : 0); tx = hx + dx / d * ring; tz = hz + dz / d * ring; speed = sp; face = [hx, hz]; if (d < ring * 1.6) act = 'reach'; }
+    if (knock && !recog) { face = [px, pz]; act = 'look'; speed *= .2; }
+    if (slam && Math.hypot(b.x - hx, b.z - hz) < .045) { b.flee = .8; b.act = 'panic'; b.actT = 1.2; }
+    if (deadAt(b.x, b.z)) { const dv = AG.uDead.value; tx = b.x + (b.x - dv.x) * 3; tz = b.z + (b.z - dv.y) * 3; speed = sp * 1.5; b.flee = Math.max(b.flee, .3); act = 'panic'; }
     if (b.flee > 0) { b.flee -= dt; const cx = handNear ? hx : 0, cz = handNear ? hz : 0, dx = b.x - cx, dz = b.z - cz, d = Math.hypot(dx, dz) + 1e-5; tx = b.x + dx / d * .03; tz = b.z + dz / d * .03; speed = sp * 2.2; face = null; }
-    if (hush && !recog) speed *= .1;
+    if (loud > .5 && !recog) act = 'cheer'; if (hum > .5 && !recog && act !== 'panic') act = 'hum'; if (hush && !recog) { speed *= .1; act = 'hush'; }
     let dx = tx - b.x, dz = tz - b.z; const d = Math.hypot(dx, dz); const want = d > .002 ? speed * Math.min(1, d / .01) : 0;
     let ax = d > 1e-5 ? dx / d * want - b.vx : -b.vx, az = d > 1e-5 ? dz / d * want - b.vz : -b.vz;
     for (let j = 0; j < bs.length; j++) { if (j === i) continue; const o = bs[j], ex = b.x - o.x, ez = b.z - o.z, e2 = ex * ex + ez * ez, md = (b.size + o.size) * .45; if (e2 < md * md && e2 > 1e-10) { const e = Math.sqrt(e2); ax += ex / e * (md - e) * 6; az += ez / e * (md - e) * 6; } }
     b.vx += ax * Math.min(1, dt * 6); b.vz += az * Math.min(1, dt * 6); b.x += b.vx * dt; b.z += b.vz * dt;
     const r = Math.hypot(b.x, b.z); if (r > .061) { b.x *= .061 / r; b.z *= .061 / r; }
     const v = Math.hypot(b.vx, b.vz);
-    const yawT = face ? Math.atan2(face[0] - b.x, face[1] - b.z) : (hush || loud > .5 || hum > .5) ? Math.atan2(px - b.x, pz - b.z) : v > .001 ? Math.atan2(b.vx, b.vz) : b.yaw;
+    const yawT = face ? Math.atan2(face[0] - b.x, face[1] - b.z) : (act === 'hush' || act === 'cheer' || act === 'hum') ? Math.atan2(px - b.x, pz - b.z) : v > .001 ? Math.atan2(b.vx, b.vz) : b.yaw;
     let dy = ((yawT - b.yaw + Math.PI) % 6.283 + 6.283) % 6.283 - Math.PI; b.yaw += dy * damp(dt, .12);
-    // voice: cheer = jump, hum = sway in time, hush = lean in toward you
-    if (loud > .5 && b.jump === 0 && Math.random() < dt * 5) b.jv = rand(.1, .18);
-    if (recog && S.t > 6 && b.jump === 0 && Math.random() < dt * 2.5) b.jv = rand(.1, .16);
+    if ((act === 'cheer' || act === 'startle') && b.jump === 0 && Math.random() < dt * 4) b.jv = rand(.1, .18);
+    if (act === 'reach' && b.jump === 0 && Math.random() < dt * .8) b.jv = rand(.06, .1);
     b.jv -= 2.2 * dt; b.jump = Math.max(0, b.jump + b.jv * dt * .3); if (b.jump === 0) b.jv = Math.max(0, b.jv);
-    b.sway = lerp(b.sway, hum > .5 ? Math.sin(T * 6.283 * VO.rate + i * .2) * .32 : 0, damp(dt, .15));
-    b.lean = lerp(b.lean, hush ? .38 : recog && S.t < 3 ? -.42 : 0, damp(dt, .3));
-    const walk = Math.min(1, v / sp), sq = 1 + Math.sin(T * 22 + b.ph) * .06 * walk;
-    const s = b.size * s01(b.sz) * (1 + (b.jump > 0 ? .05 : 0)) * (deadAt(b.x, b.z) ? .8 : 1);
+    b.sway = lerp(b.sway, act === 'hum' ? Math.sin(T * 6.283 * VO.rate + i * .2) * .32 : act === 'chat' ? Math.sin(T * 3 + b.ph) * .08 : 0, damp(dt, .15));
+    b.lean = lerp(b.lean, act === 'hush' ? .38 : act === 'look' || act === 'reach' ? -.4 : act === 'build' && !face ? 0 : act === 'build' ? .25 + Math.max(0, Math.sin(T * 9 + b.ph)) * .15 : 0, damp(dt, .2));
+    const walk = Math.min(1, v / sp), sq = 1 + Math.sin(T * 22 + b.ph) * .06 * walk + (act === 'chat' ? Math.max(0, Math.sin(T * 7 + b.ph)) * .05 : 0);
+    const s = b.size * s01(b.sz) * (deadAt(b.x, b.z) ? .8 : 1);
     _o.position.set(b.x, b.jump * 4 * b.size / .005, b.z); _o.rotation.set(b.lean + walk * .12, b.yaw, b.sway + Math.sin(T * 11 + b.ph) * .1 * walk, 'YXZ'); _o.scale.set(s, s * sq, s); _o.updateMatrix();
     BODY.setMatrixAt(n, _o.matrix); CREST.setMatrixAt(n, _o.matrix); CREST.setColorAt(n, STAINS[b.lin].c); n++;
-    if (big) { const lx = CFG.DISH.x + b.x + Math.cos(-b.yaw) * b.size * .6, lz = CFG.DISH.z + b.z + Math.sin(-b.yaw) * b.size * .6, ly = CFG.DISH.agar + _o.position.y + b.size * .62; const lc = STAINS[2].c, k = (.45 + VO.level * .9 + (hum > .5 ? .3 : 0)) * s01(b.sz);
-      glow.add(lx, ly, lz, b.size * .9, 1, .78 * lc.g / .55, .42, k * .55); glow.add(lx, ly, lz, b.size * .14, 1, .95, .8, k); } // their lanterns
+    // arms: [x swing, z raise] for left and right
+    const sw = Math.sin(T * 22 + b.ph) * .55 * walk, w = T * 14 + b.ph; let aL = [sw, .25], aR = [-sw, .25];
+    if (act === 'wave') aR = [0, 2.5 + .45 * Math.sin(w)];
+    else if (act === 'cheer' || act === 'reach' || (act === 'look' && recog)) aL = aR = [0, 2.6 + .25 * Math.sin(w * .8)], aR = [0, 2.6 + .25 * Math.sin(w * .8 + 1.5)];
+    else if (act === 'panic' || act === 'startle') { aL = [0, 2.3 + .8 * Math.sin(w * 1.8)]; aR = [0, 2.3 + .8 * Math.sin(w * 1.8 + 2)]; }
+    else if (act === 'hum') { const k = Math.sin(T * 6.283 * VO.rate + i * .2); aL = [0, .7 + .5 * k]; aR = [0, .7 - .5 * k]; }
+    else if (act === 'hush') { aL = [-.3, .12]; aR = [-.3, .12]; }
+    else if (act === 'build' && face) aR = [-1.4 - 1.1 * Math.max(0, Math.sin(T * 9 + b.ph)), .3];
+    else if (act === 'chat') aR = [-.4, .3 + .7 * Math.max(0, Math.sin(T * 4 + b.ph))];
+    for (const side of [-1, 1]) { const a = side < 0 ? aL : aR; b['a' + side] = lerp(b['a' + side] ?? .25, a[1], damp(dt, .06)); b['x' + side] = lerp(b['x' + side] ?? 0, a[0], damp(dt, .06));
+      _ma.makeRotationFromEuler(_ea.set(b['x' + side], 0, side * b['a' + side])).setPosition(side * .36, .6, .03); _ma.premultiply(_o.matrix); ARM.setMatrixAt(na++, _ma);
+      if (side < 0 && big) { _vh.set(0, -.36, 0).applyMatrix4(_ma); const lx = CFG.DISH.x + _vh.x, ly = CFG.DISH.agar + _vh.y, lz = CFG.DISH.z + _vh.z, k = (.5 + VO.level * .9 + (act === 'hum' ? .35 : 0)) * s01(b.sz);
+        glow.add(lx, ly, lz, b.size * .85, 1, .78, .42, k * .5); glow.add(lx, ly, lz, b.size * .13, 1, .95, .8, k); } } // a lantern in the left hand
   }
-  BODY.count = CREST.count = n; BODY.instanceMatrix.needsUpdate = CREST.instanceMatrix.needsUpdate = true; CREST.instanceColor.needsUpdate = true;
+  BODY.count = CREST.count = n; ARM.count = na; BODY.instanceMatrix.needsUpdate = CREST.instanceMatrix.needsUpdate = ARM.instanceMatrix.needsUpdate = true; CREST.instanceColor.needsUpdate = true;
   if (n && hum > .5 && Math.random() < dt * 6) chirp(VO.pitch * 1.5 * 4, .03); // they hum along a fifth above you, two octaves up
-  if (n && loud > .5 && Math.random() < dt * 10) chirp(rand(2400, 3600), .05);
+  if (n && (loud > .5 || (recog && S.t > 8)) && Math.random() < dt * 10) chirp(rand(2400, 3600), .05);
 }
 
 // ═══════════════════════════ DISH: the sequence, the answer, death and life ═══════════════════════════
-const S = { phase: 'poster', t: 0, stage: 0, round: 0, seq: [], step: 0, stepT: 0, replayed: false, mix: [0, 0, 0], drops: [], dishOK: true, blight: false, monT: 0, unpackT: 0, colonyBoot: false, godT: 0 };
+const S = { phase: 'poster', t: 0, stage: 0, round: 0, seq: [], step: 0, stepT: 0, replayed: false, mix: [0, 0, 0], drops: [], dishOK: true, blight: false, monT: 0, unpackT: 0, colonyBoot: false, fails: 0, per: .9, lampKick: 0, binWob: 0, stageUpT: -99, cause: [] };
 const FLASH = { i: 0, c: new C(), g: 0, gi: 0 };
+const TAGS = ['', 'Something is awake.', 'They divide. Look closer.', 'They are organising.', 'They have started to build.', 'Somebody is home.', 'A town, and it is growing.'];
+const CAUSES = [['Cause of death:', 'wrong colour, given', 'with confidence.'], ['Cause of death:', 'enthusiasm.', ''], ['The culture has', 'declined to continue.', ''], ['Cause of death:', 'a strong opinion', 'about colour.'], ['It was like this', 'when we found it.', ''], ['Cause of death:', 'not listening.', '']];
 function genSeq(n) { const s = []; for (let i = 0; i < n; i++) { let c; do { c = Math.random() * 3 | 0; } while (i >= 2 && c === s[i - 1] && c === s[i - 2]); s.push(c); } if (n >= 3 && new Set(s).size < 3) { const miss = [0, 1, 2].find(c => !s.includes(c)); s[1 + (Math.random() * (n - 1) | 0)] = miss; } return s; }
 function setPhase(p) { S.phase = p; S.t = 0; }
-function startRound(newSeq = true) { const n = CFG.ROUNDS[Math.min(S.round, CFG.ROUNDS.length - 1)]; if (newSeq || !S.seq.length) S.seq = genSeq(n); S.step = 0; S.stepT = 0; S.replayed = false; setPhase('listen'); }
+// difficulty: lengths climb slowly, playback quickens a little, and two misses in a round take one colour off
+function startRound(newSeq = true) { let n = CFG.ROUNDS[Math.min(S.round, CFG.ROUNDS.length - 1)]; if (S.fails >= 2) n = Math.max(3, n - 1); if (newSeq || !S.seq.length) S.seq = genSeq(n); S.step = 0; S.stepT = 0; S.replayed = false; S.lastK = -1; S.per = S.round < 2 ? .95 : S.round < 4 ? .86 : .78; setPhase('listen'); }
 function dishDrop(st, x, z) {
   S.mix[st.glyph]++; S.drops.push([st.glyph, x, z]); if (S.drops.length > 40) S.drops.shift();
   bloom(st.glyph, x, z, 1.3); if (S.stage >= 3) seedColony(x, z, 2);
   if (S.phase !== 'drip') return;
-  if (st.glyph === S.seq[S.step]) { S.step++; S.stepT = 0; FLASH.c.copy(st.c); FLASH.i = Math.max(FLASH.i, .55); FLASH.g = st.glyph; FLASH.gi = .8; vibe(st.note, now(), .22, dishPan()); if (S.step >= S.seq.length) success(); }
-  else fail(x, z);
+  if (st.glyph === S.seq[S.step]) { S.step++; S.stepT = 0; FLASH.c.copy(st.c); FLASH.i = Math.max(FLASH.i, .55); FLASH.g = st.glyph; FLASH.gi = .8; vibe(st.note, now(), .22, dishPan()); st.pulse = 1; if (S.step >= S.seq.length) success(); }
+  else fail(x, z, st);
 }
+const SPIRAL = [];
 function success() {
-  setPhase('success'); const before = S.stage; S.stage = Math.min(6, Math.max(S.stage, S.round + 1)); S.round++;
+  setPhase('success'); const before = S.stage; S.stage = Math.min(6, Math.max(S.stage, S.round + 1)); S.round++; S.fails = 0;
   if (S.blight) { S.blight = false; S.cureT = T; }
   for (let s = before + 1; s <= S.stage; s++) buildStage(s);
-  S.stageT = T; theremin(); for (let i = 0; i < 40; i++) { const [x, z] = dishPoint(.05, .02); SPLASH.push({ p: new V(CFG.DISH.x + x, CFG.DISH.agar + .001, CFG.DISH.z + z), v: new V(rand(-.02, .02), rand(.12, .3), rand(-.02, .02)), t: 0, life: rand(.8, 1.4), c: new C(PAL.spark), size: .0012, a: 1, y0: -1 }); }
-  if (S.stage >= 5) fireworks(S.stage >= 6 ? 5 : 2);
+  S.lampKick = 1; theremin(); RINGS.push({ x: 0, z: 0, c: new C(PAL.spark), t: 0, big: true });
+  for (let i = 0; i < 90; i++) SPIRAL.push({ a: Math.random() * 6.283, r: rand(.004, .05), y: 0, va: rand(1.2, 2.6) * (i % 2 ? 1 : -1), vy: rand(.03, .09), t: -i * .012, life: rand(1.4, 2.4), c: (i % 4 ? new C(PAL.spark) : STAINS[i % 3].c.clone().lerp(new C(PAL.spark), .4)) });
+  if (S.stage > before) { S.stageUpT = T; setTimeout(fanfare, 900); }
+  if (S.stage >= 5) setTimeout(() => fireworks(S.stage >= 6 ? 5 : 3), 600);
+  if (S.stage >= 5) for (const b of L.beings) { b.jv = rand(.1, .18); b.act = 'cheer'; b.actT = 3; }
 }
-function fail(x, z) {
-  sfx('wrong', dishPan()); FLASH.i = 0; FLASH.gi = 0;
-  if (S.stage === 0) { setPhase('dead'); AG.uDead.value.set(x, z, .001, Math.random() * 9); AG.uDeadF.value = 1; deadSound(); }
-  else { setPhase('blight'); S.blight = true; AG.uDead.value.set(x * .5, z * .5, .001, Math.random() * 9); AG.uDeadF.value = 1; deadSound(true); }
+function fail(x, z, st) {
+  S.fails++; FLASH.i = 0; FLASH.gi = 0; S.cause = pick(CAUSES); S.wrong = { x, z, c: st ? st.c : new C(PAL.soot) };
+  sfx('uhoh', dishPan());
+  if (S.stage === 0) { setPhase('dead'); AG.uDead.value.set(x, z, 0, Math.random() * 9); AG.uDeadF.value = 1; }
+  else { setPhase('blight'); S.blight = true; AG.uDead.value.set(x * .6, z * .6, 0, Math.random() * 9); AG.uDeadF.value = 1; for (const b of L.beings) { b.flee = rand(.6, 1.4); b.act = 'panic'; b.actT = 2.5; } }
 }
-const RIMB = []; // the dish counts your answers with beads of light round the near rim
 function updDish(dt) {
   S.t += dt; FLASH.i = Math.max(0, FLASH.i - dt * 2.4); FLASH.gi = Math.max(0, FLASH.gi - dt * 2.2);
   const p = S.phase;
-  if (p === 'listen') { // a breath, then flash, note, glyph for each step
-    const t0 = 1, per = .82; const k = Math.floor((S.t - t0) / per), f = (S.t - t0) - k * per;
-    if (S.t < t0) { if (S.t - dt <= 0) { sfx('ready', dishPan()); } }
-    else if (k < S.seq.length) { const st = STAINS[S.seq[k]]; if (f - dt <= 0 || (f < dt && S.lastK !== k)) { vibe(st.note, now(), .3, dishPan()); S.lastK = k; } FLASH.c.copy(st.c); FLASH.i = Math.max(FLASH.i, f < .5 ? 1 - f / .5 * .4 : 0); FLASH.g = st.glyph; FLASH.gi = Math.max(FLASH.gi, f < .55 ? 1 : 0); }
-    else if (S.t > t0 + S.seq.length * per + .3) { S.lastK = -1; setPhase('drip'); S.stepT = 0; }
+  if (p === 'listen') { // lights down, a breath, then flash, note, glyph (and its bottle lights) for each step
+    const t0 = 1.1, per = S.per; const k = Math.floor((S.t - t0) / per), f = (S.t - t0) - k * per;
+    if (S.t < t0) { if (S.t - dt <= 0) sfx('ready', dishPan()); }
+    else if (k < S.seq.length) { const st = STAINS[S.seq[k]]; if (S.lastK !== k) { vibe(st.note, now(), .3, dishPan()); S.lastK = k; st.pulse = 1; } FLASH.c.copy(st.c); FLASH.i = Math.max(FLASH.i, f < .5 ? 1 - f / .5 * .4 : 0); FLASH.g = st.glyph; FLASH.gi = Math.max(FLASH.gi, f < per * .66 ? 1 : 0); }
+    else if (S.t > t0 + S.seq.length * per + .25) { setPhase('drip'); S.stepT = 0; sfx('turn', dishPan()); for (const q of PIPS) q.glint = 1; }
   }
-  if (p === 'drip') { S.stepT += dt; if (S.stepT > CFG.STEP_TIMEOUT) { if (!S.replayed) { const st = S.step; startRound(false); S.replayed = true; } else fail(0, 0); } }
-  if (p === 'success' && S.t > 2.4) { if (S.stage >= 6 && !S.recognised) { S.recognised = true; setPhase('recog'); S.monT = T + 2.5; monG.visible = true; chord(); } else setPhase('grow'); }
-  if (p === 'grow' && S.t > (S.recognised ? 14 : 6)) startRound();
-  if (p === 'recog') { if (S.t > 3 && S.t - dt <= 3) fireworks(3); if (S.t > 7 && S.t - dt <= 7) { fireworks(6); cheer(); } if (S.t > 13) { setPhase('grow'); } }
-  if (p === 'dead') { AG.uDead.value.z = lerp(.001, DR * 1.25, s01(S.t / 2.6)); if (Math.random() < dt * 30 && S.t < 2.2) { const a = Math.random() * 6.283, r = AG.uDead.value.z * rand(.3, .9); PUFFS.push({ p: new V(CFG.DISH.x + AG.uDead.value.x + Math.cos(a) * r, CFG.DISH.agar + .002, CFG.DISH.z + AG.uDead.value.y + Math.sin(a) * r), t: 0, s: rand(.004, .012), w: Math.random() }); } if (S.t > 3.4) { setPhase('swap'); swapStart(); } }
-  if (p === 'blight') { AG.uDead.value.z = lerp(.001, .028, s01(S.t / 2)); if (S.t > 3) setPhase('grow'); }
+  if (p === 'drip') { S.stepT += dt; if (S.stepT > CFG.STEP_TIMEOUT) { if (!S.replayed) { startRound(false); S.replayed = true; } else fail(0, 0); } }
+  if (p === 'success' && S.t > 2.6) { if (S.stage >= 6 && !S.recognised) { S.recognised = true; setPhase('recog'); S.monT = T + 3; monG.visible = true; chord(); } else setPhase('grow'); }
+  if (p === 'grow' && S.t > (S.recognised ? 12 : S.stage >= 4 ? 7 : 5)) startRound();
+  if (p === 'recog') { for (const [tt, n] of [[3.5, 3], [6, 4], [8.5, 8], [10, 6]]) if (S.t > tt && S.t - dt <= tt) fireworks(n); if (S.t > 8.5 && S.t - dt <= 8.5) cheer(); if (S.t > 15) setPhase('grow'); }
+  // death, with comic timing: a beat, an "uh-oh", the mould, the trombone, a burp, the cause
+  if (p === 'dead' || p === 'blight') { const big = p === 'dead', t = S.t, w = S.wrong;
+    dishG.rotation.x = t < .9 ? Math.sin(t * 38) * .012 * s01(t / .2) * (1 - s01((t - .6) / .3)) : 0;
+    if (t < .8) glow.add(CFG.DISH.x + w.x, CFG.DISH.agar + .001, CFG.DISH.z + w.z, .012 + Math.sin(t * 20) * .003, w.c.r, w.c.g, w.c.b, .7);
+    if (t > .8 && t - dt <= .8) trombone(big);
+    AG.uDead.value.z = big ? lerp(.001, DR * 1.3, s01((t - .8) / 2)) : lerp(.001, .03, s01((t - .8) / 1.6));
+    if (t > .8 && t < 2.6 && Math.random() < dt * (big ? 30 : 10)) { const a = Math.random() * 6.283, r = AG.uDead.value.z * rand(.3, .9); PUFFS.push({ p: new V(CFG.DISH.x + AG.uDead.value.x + Math.cos(a) * r, CFG.DISH.agar + .002, CFG.DISH.z + AG.uDead.value.y + Math.sin(a) * r), t: 0, s: rand(.004, .012), w: Math.random() }); }
+    if (big && t > 3 && t - dt <= 3) { sfx('burp', dishPan()); BUBBLE.t = 0; }
+    if (big && t > 4.3) { setPhase('swap'); swapStart(); }
+    if (!big && t > 3.4) setPhase('grow'); }
+  if (BUBBLE.t >= 0) { BUBBLE.t += dt; const k = BUBBLE.t / .6, x = CFG.DISH.x + S.wrong.x * .5, z = CFG.DISH.z + S.wrong.z * .5; if (k < 1) { glow.add(x, CFG.DISH.agar + .002 + k * .004, z, .002 + k * .006, .7, .72, .6, .5, 1); } else { BUBBLE.t = -1; for (let i = 0; i < 4; i++) PUFFS.push({ p: new V(x, CFG.DISH.agar + .008, z), t: 0, s: .01, w: Math.random() }); } }
   if (S.cureT && T - S.cureT < 3.5) { AG.uDeadF.value = 1 - s01((T - S.cureT) / 3.2); if (AG.uDeadF.value <= .01) { AG.uDead.value.z = 0; S.cureT = 0; } }
   if (p === 'swap') updSwap();
-  // flashes into the agar
+  // flashes into the agar; bottles echo the colour being shown
   AG.uFlashC.value.copy(FLASH.c); AG.uFlashI.value = FLASH.i; AG.uGlyph.value = FLASH.g; AG.uGlyphI.value = FLASH.gi;
-  AG.uWarm.value = lerp(AG.uWarm.value, p === 'success' ? .6 : p === 'recog' ? .4 : 0, damp(dt, .4));
+  AG.uWarm.value = lerp(AG.uWarm.value, p === 'success' ? .7 * (1 - s01((S.t - 1) / 1.6)) + .1 : p === 'recog' ? .45 : 0, damp(dt, .25));
+  S.lampKick = Math.max(0, S.lampKick - dt * .8); S.binWob = Math.max(0, S.binWob - dt * 1.3); binG.rotation.z = Math.sin(T * 24) * .06 * S.binWob * S.binWob;
   // answer beads round the near rim
-  if (p === 'drip' || p === 'listen') { const n = S.seq.length; for (let i = 0; i < n; i++) { const a = Math.PI / 2 + (i - (n - 1) / 2) * .16, x = CFG.DISH.x + Math.cos(a) * (DR + .006), z = CFG.DISH.z + Math.sin(a) * (DR + .006); const done = p === 'drip' && i < S.step, st = STAINS[S.seq[i]];
-      if (done) { glow.add(x, .0175, z, .004, st.c.r, st.c.g, st.c.b, .9); glow.add(x, .0175, z, .0012, 1, .95, .85, 1); } else glow.add(x, .0175, z, .0016, .9, .85, .7, p === 'drip' && i === S.step ? .5 + .4 * Math.sin(T * 6) : .22); } }
-  for (let i = PUFFS.length - 1; i >= 0; i--) { const f = PUFFS[i]; f.t += dt; f.p.y += dt * .012; if (f.t > 1.6) { PUFFS.splice(i, 1); continue; } soot.add(f.p.x, f.p.y, f.p.z, f.s * (1 + f.t), .17, .16, .14, (1 - f.t / 1.6) * .55 * s01(f.t / .2), 0, f.w * 6, f.w); }
+  if (p === 'drip' || p === 'listen') { const n = S.seq.length; for (let i = 0; i < n; i++) { const a = Math.PI / 2 + (i - (n - 1) / 2) * .16, x = CFG.DISH.x + Math.cos(a) * (DR + .007), z = CFG.DISH.z + Math.sin(a) * (DR + .007); const done = p === 'drip' && i < S.step, st = STAINS[S.seq[i]];
+      if (done) { glow.add(x, .0175, z, .005, st.c.r, st.c.g, st.c.b, .9); glow.add(x, .0175, z, .0014, 1, .95, .85, 1); } else glow.add(x, .0175, z, .0018, .9, .85, .7, p === 'drip' && i === S.step ? .55 + .4 * Math.sin(T * 6) : .25); } }
+  for (let i = PUFFS.length - 1; i >= 0; i--) { const f = PUFFS[i]; f.t += dt; f.p.y += dt * .014; if (f.t > 1.8) { PUFFS.splice(i, 1); continue; } soot.add(f.p.x, f.p.y, f.p.z, f.s * (1 + f.t * 1.2), .17, .16, .14, (1 - f.t / 1.8) * .6 * s01(f.t / .2), 0, f.w * 6, f.w); }
+  for (let i = SPIRAL.length - 1; i >= 0; i--) { const s = SPIRAL[i]; s.t += dt; if (s.t < 0) continue; if (s.t > s.life) { SPIRAL.splice(i, 1); continue; } s.a += s.va * dt; s.y += s.vy * dt; s.r *= 1 - dt * .25; const k = s.t / s.life, tw = .6 + .4 * Math.sin(s.t * 30 + s.a * 5);
+    glow.add(CFG.DISH.x + Math.cos(s.a) * s.r, CFG.DISH.agar + .002 + s.y, CFG.DISH.z + Math.sin(s.a) * s.r, .0024 * (1 - k * .5), s.c.r, s.c.g, s.c.b, s01(s.t / .15) * (1 - k) * tw, k > .6 ? 2 : 0, s.a); }
 }
-const PUFFS = [];
-// a dead dish goes into the pedal bin with a clang, and the top of the stack slides into its place
+const PUFFS = [], BUBBLE = { t: -1 };
+// a dead dish: the pedal goes down, the lid flips up, the dish is lobbed in with a spin, clang, the bin wobbles; the next dish glides off the stack
 const SW = { from: new V() };
-function swapStart() { SW.from.copy(dishG.position); SW.top = stack[stack.length - 1]; for (const s of stack) if (s.visible) SW.top = s; SW.topFrom = SW.top.position.clone(); SW.clang = false; }
+function swapStart() { SW.from.copy(dishG.position); SW.top = null; for (const s of stack) if (s.visible) SW.top = s; if (!SW.top) { stack.forEach(s => { s.visible = true; }); SW.top = stack[stack.length - 1]; } SW.topFrom = SW.top.position.clone(); SW.clang = SW.clunk = false; sfx('pedal', _v.set(CFG.BIN.x, .02, CFG.BIN.z)); }
 function updSwap() {
-  const t = S.t, bin = binG.userData.lid;
-  bin.rotation.x = -s01(t / .4) * 1.1 * (1 - s01((t - 1.7) / .3));
-  if (t < 1.4) { const k = s01(t / 1.4); dishG.position.set(lerp(SW.from.x, CFG.BIN.x, k), Math.sin(k * Math.PI) * .12 + k * .05, lerp(SW.from.z, CFG.BIN.z, k)); dishG.rotation.z = -k * 1.2; }
-  else { dishG.position.y = lerp(.05 + .0, -.01, s01((t - 1.4) / .25)); dishG.visible = t < 1.62; if (!SW.clang && t > 1.6) { SW.clang = true; sfx('clang', _v.set(CFG.BIN.x, .07, CFG.BIN.z)); } }
-  if (t > .6) { const k = s01((t - .6) / 1.6); const tp = SW.top; tp.visible = true; const wx = lerp(CFG.STACK.x + SW.topFrom.x, CFG.DISH.x, k), wz = lerp(CFG.STACK.z + SW.topFrom.z, CFG.DISH.z, k); tp.position.set(wx - CFG.STACK.x, SW.topFrom.y + Math.sin(k * Math.PI) * .05 - SW.topFrom.y * k, wz - CFG.STACK.z); }
-  if (t > 2.4) { // the fresh dish is now ours: hide the moved one and put ours back, clean, with its lid off
-    SW.top.visible = false; SW.top.position.copy(SW.topFrom); if (stack.every(s => !s.visible)) stack.forEach(s => { s.visible = true; });
+  const t = S.t, lid = binG.userData.lid, ped = binG.userData.pedal, top = CFG.BIN.h - CFG.TRAY.base;
+  const open = s01(t / .25) * (1 - s01((t - 1.55) / .2)); lid.rotation.x = -1.75 * open + (t > 1.75 ? Math.sin((t - 1.75) * 30) * .06 * Math.max(0, 1 - (t - 1.75) * 3) : 0); ped.rotation.x = .25 * open;
+  if (t > 1.75 && !SW.clunk) { SW.clunk = true; sfx('lidshut', _v.set(CFG.BIN.x, top, CFG.BIN.z)); }
+  if (t < .45) { const k = s01(t / .45); dishG.position.set(SW.from.x, .03 * k, SW.from.z); dishG.rotation.z = -.15 * k; }
+  else if (t < 1.25) { const k = (t - .45) / .8, e = k; dishG.position.set(lerp(SW.from.x, CFG.BIN.x, e), lerp(.03, top + .02, e) + Math.sin(k * Math.PI) * .14, lerp(SW.from.z, CFG.BIN.z, e)); dishG.rotation.set(k * 5.5, 0, -.15 - k * 7); }
+  else { const k = s01((t - 1.25) / .15); dishG.position.y = lerp(top + .02, top - .09, k); dishG.visible = k < .99; if (!SW.clang) { SW.clang = true; S.binWob = 1; sfx('clang', _v.set(CFG.BIN.x, top, CFG.BIN.z)); } }
+  if (t > 1) { const k = s01((t - 1) / 1.3), tp = SW.top; tp.visible = true; const wx = lerp(CFG.STACK.x + SW.topFrom.x, CFG.DISH.x, k), wz = lerp(CFG.STACK.z + SW.topFrom.z, CFG.DISH.z, k);
+    tp.position.set(wx - CFG.STACK.x, lerp(SW.topFrom.y, 0, k) + Math.sin(k * Math.PI) * .045, wz - CFG.STACK.z); tp.rotation.z = Math.sin(k * Math.PI) * .08; }
+  if (t > 2.4) { // the fresh dish is now ours: hide the moved one, put ours back clean
+    SW.top.visible = false; SW.top.position.copy(SW.topFrom); SW.top.rotation.z = 0; if (stack.every(s => !s.visible)) stack.forEach(s => { s.visible = true; });
     dishG.position.set(CFG.DISH.x, 0, CFG.DISH.z); dishG.rotation.set(0, 0, 0); dishG.visible = true; AG.uDead.value.set(0, 0, 0, 0); AG.uDeadF.value = 0; fieldReset(); sfx('clink', dishG.position);
     startRound();
   }
@@ -898,6 +968,17 @@ function sfx(k, pos, v = 1) { if (!A.ctx) return; const c = A.ctx, t = c.current
   else if (k === 'ready') { vibe(392, t, .12, pos, 1.6); vibe(587.33, t + .12, .1, pos, 1.6); }
   else if (k === 'wrong') { const g = c.createGain(); env(g, t, .005, .12, .5); const o = osc('triangle', 220, t, .5, g); o.frequency.exponentialRampToValueAtTime(196, t + .4); g.connect(d); }
   else if (k === 'clang') { for (const f of [312, 523, 787, 1203, 1640]) { const g = c.createGain(); env(g, t, .001, .09, rand(.5, 1.1)); osc('sine', f * rand(.98, 1.02), t, 1.2, g); g.connect(d); } noiseHit(t, .06, 2000, .7, .2, d); }
+  else if (k === 'uhoh') { vibe(392, t, .16, pos, .5, d); vibe(311.13, t + .22, .18, pos, 1.2, d); }
+  else if (k === 'turn') { vibe(659.25, t, .09, pos, .8, d); vibe(987.77, t + .1, .08, pos, 1, d); }
+  else if (k === 'burp') { const o = c.createOscillator(), g = c.createGain(); o.type = 'sawtooth'; o.frequency.setValueAtTime(95, t); o.frequency.linearRampToValueAtTime(70, t + .25); const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420; env(g, t, .02, .22, .28); o.connect(lp).connect(g).connect(d); o.start(t); o.stop(t + .4); noiseHit(t, .2, 300, .8, .08, d, 'lowpass'); }
+  else if (k === 'pedal') { noiseHit(t, .05, 1800, 3, .12, d); const g = c.createGain(); env(g, t + .05, .001, .05, .2); osc('triangle', 210, t + .05, .25, g); g.connect(d); }
+  else if (k === 'lidshut') { for (const f of [180, 410, 960]) { const g = c.createGain(); env(g, t, .001, .08, .35); osc('sine', f, t, .4, g); g.connect(d); } noiseHit(t, .05, 1200, .8, .15, d); }
+  else if (k === 'gurgle') { for (let i = 0; i < 6; i++) { const tt = t + i * .06 + Math.random() * .03, o = c.createOscillator(), g = c.createGain(); o.frequency.setValueAtTime(rand(500, 800), tt); o.frequency.exponentialRampToValueAtTime(rand(1200, 1800), tt + .04); env(g, tt, .003, .05, .05); o.connect(g).connect(d); o.start(tt); o.stop(tt + .08); } }
+  else if (k === 'hover') { const g = c.createGain(); env(g, t, .001, .025, .25); osc('sine', 3136, t, .3, g); g.connect(d); }
+  else if (k === 'tink') { for (const [f, a] of [[1760 * rand(.97, 1.03), .07], [4400, .03]]) { const g = c.createGain(); env(g, t, .001, a * v, .7); osc('sine', f, t, .8, g); g.connect(d); } }
+  else if (k === 'boing') { const o = c.createOscillator(), g = c.createGain(); o.frequency.setValueAtTime(330, t); o.frequency.exponentialRampToValueAtTime(220, t + .5); const l = c.createOscillator(), lg = c.createGain(); l.frequency.value = 9; lg.gain.value = 25; l.connect(lg).connect(o.frequency); env(g, t, .005, .06, .5); o.connect(g).connect(d); o.start(t); o.stop(t + .6); l.start(t); l.stop(t + .6); }
+  else if (k === 'whoosh') { const bp = noiseHit(t, .5, 900, 2, .04, d); bp.frequency.exponentialRampToValueAtTime(3500, t + .5); }
+  else if (k === 'flip') noiseHit(t, .12, 2600, 1.2, .07, d);
   else if (k === 'pop') { noiseHit(t, .08, 1800, .8, .12, d); const g = c.createGain(); env(g, t, .001, .04, .4); osc('sine', rand(1800, 2600), t, .4, g); g.connect(d); }
 }
 function deadSound(small) { if (!A.ctx) return; const c = A.ctx, t = c.currentTime, d = out(dishPan(), .4);
@@ -908,6 +989,12 @@ function theremin() { if (!A.ctx) return; const c = A.ctx, t = c.currentTime, d 
   const o = c.createOscillator(), g = c.createGain(), l = c.createOscillator(), lg = c.createGain(); o.frequency.setValueAtTime(392, t); o.frequency.exponentialRampToValueAtTime(784, t + .9); o.frequency.setValueAtTime(784, t + .9); o.frequency.exponentialRampToValueAtTime(1046.5, t + 1.6);
   l.frequency.value = 6; lg.gain.value = 9; l.connect(lg).connect(o.frequency); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.13, t + .25); g.gain.setValueAtTime(.13, t + 1.5); g.gain.exponentialRampToValueAtTime(.0001, t + 2.6);
   o.connect(g).connect(d); o.start(t); o.stop(t + 2.7); l.start(t); l.stop(t + 2.7); [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => vibe(f, t + .9 + i * .09, .12, dishPan())); }
+function trombone(big) { if (!A.ctx) return; const c = A.ctx, t = c.currentTime + .05, d = out(dishPan(), .5); // wah, wah, wah, waaah
+  const notes = big ? [233.08, 220, 207.65, 196] : [233.08, 207.65];
+  notes.forEach((f, i) => { const last = i === notes.length - 1, tt = t + i * .42, dur = last ? 1.3 : .36, o = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter(); o.type = 'sawtooth'; o.frequency.setValueAtTime(f, tt); if (last) { const l = c.createOscillator(), lg = c.createGain(); l.frequency.value = 5.5; lg.gain.value = 4; l.connect(lg).connect(o.frequency); l.start(tt); l.stop(tt + dur); }
+    lp.type = 'lowpass'; lp.Q.value = 6; lp.frequency.setValueAtTime(350, tt); lp.frequency.linearRampToValueAtTime(1300, tt + .12); lp.frequency.linearRampToValueAtTime(last ? 300 : 700, tt + dur);
+    g.gain.setValueAtTime(0, tt); g.gain.linearRampToValueAtTime(.1, tt + .04); g.gain.setValueAtTime(.1, tt + dur - .08); g.gain.linearRampToValueAtTime(0, tt + dur); o.connect(lp).connect(g).connect(d); o.start(tt); o.stop(tt + dur + .05); }); }
+function fanfare() { if (!A.ctx) return; const t = A.ctx.currentTime; [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => vibe(f, t + i * .085, .13, dishPan(), 2.2)); vibe(261.63, t, .1, dishPan(), 2.5); }
 function chord() { if (!A.ctx) return; const t = A.ctx.currentTime; [261.63, 329.63, 392, 493.88, 587.33].forEach((f, i) => { const g = A.ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.05, t + 2.5); g.gain.exponentialRampToValueAtTime(.0001, t + 9); osc('triangle', f, t, 9, g); g.connect(out(dishPan(), .8)); }); }
 function chirp(f, v) { if (!A.ctx) return; const c = A.ctx, t = c.currentTime, d = out(dishPan(), .2); const o = c.createOscillator(), g = c.createGain(); f = clamp(f, 900, 4200); o.frequency.setValueAtTime(f * .8, t); o.frequency.exponentialRampToValueAtTime(f, t + .04); env(g, t, .005, v, .08); o.connect(g).connect(d); o.start(t); o.stop(t + .12); }
 function cheer() { for (let i = 0; i < 24; i++) setTimeout(() => chirp(rand(2000, 3800), .04), i * 40 + Math.random() * 300); }
@@ -952,11 +1039,41 @@ function updPlace(dt, frame) {
   if (PL.have && (PH.some(h => h.down) || S.t > 25)) { placeLab(PL.pos, PL.yaw); ghost.visible = false; setPhase('unpack'); S.unpackT = T; sfx('tick', null); }
 }
 function placeLab(p, yaw) { lab.position.copy(p).y += CFG.TRAY.base; lab.rotation.set(0, yaw, 0); lab.updateMatrixWorld(true); labQi.copy(lab.quaternion).invert(); }
+// ═══════════════════════════ LITTLE THINGS TO POKE: the lamp bobs on its gooseneck, the card flips, the bottles ring, the bin peeks, the glass knocks ═══════════════════════════
+const TOUCH = { in: {}, last: {} }, LS = { ax: 0, az: 0, vx: 0, vz: 0, q0: null }, FLIP = { on: 0, a: 0 };
+function touchTargets() {
+  const t = []; lampG.userData.head.getWorldPosition(_v); t.push(['lamp', toLab(_v.clone()), .05]);
+  t.push(['card', new V(CFG.CARD.x, .05, CFG.CARD.z), .055]);
+  STAINS.forEach((st, i) => t.push(['bottle' + i, new V(CFG.RACK.x + SLOT_X[i], .042, CFG.RACK.z + .006), .022]));
+  t.push(['pedal', new V(CFG.BIN.x, .0, CFG.BIN.z + CFG.BIN.r + .02), .045]); t.push(['binlid', new V(CFG.BIN.x, CFG.BIN.h - CFG.TRAY.base + .02, CFG.BIN.z), .08]);
+  return t;
+}
+function poke(k, h) {
+  if (k === 'lamp') { const v = h.tipVel; LS.vx += clamp(v.z, -1, 1) * 6 + 3; LS.vz += clamp(-v.x, -1, 1) * 6 + rand(-2, 2); sfx('boing', h.tip); }
+  else if (k === 'card') { FLIP.on = 1 - FLIP.on; sfx('flip', h.tip); }
+  else if (k.startsWith('bottle')) { const st = STAINS[+k[6]]; st.pulse = 1; vibe(st.note * 2, now(), .12, h.tip, 1.6); sfx('tink', h.tip, .6); }
+  else if (k === 'pedal' || k === 'binlid') { S.binPeekT = T; sfx('pedal', h.tip); setTimeout(() => sfx('lidshut', h.tip), 900); }
+  else if (k === 'glass') { S.knockT = T; sfx('tink', h.tip); if (L.beings.length) setTimeout(() => say(3400, .05), 200); }
+  buzz(h, .3, 20);
+}
+function updTouch(dt) {
+  if (S.phase === 'poster' || S.phase === 'place') return; const ts = touchTargets();
+  for (const h of PH) { if (!h.tracked) continue; const tip = h.tip;
+    const r = Math.hypot(tip.x - CFG.DISH.x, tip.z - CFG.DISH.z); ts.push(['glass', null, 0, r > DR - .006 && r < DR + .008 && tip.y < .028 && tip.y > -.005]);
+    for (const [k, p, rad, hit] of ts) { const id = h.i + k, inside = p ? tip.distanceTo(p) < rad : hit; if (inside && !TOUCH.in[id] && T - (TOUCH.last[id] || -9) > .5 && !(h.hold && k.startsWith('bottle'))) { TOUCH.last[id] = T; poke(k, h); } TOUCH.in[id] = inside; } ts.pop(); }
+  // the lamp on its spring
+  const head = lampG.userData.head; if (!LS.q0) LS.q0 = head.quaternion.clone();
+  LS.vx += -LS.ax * 140 * dt; LS.vz += -LS.az * 140 * dt; LS.vx *= Math.exp(-dt * 3); LS.vz *= Math.exp(-dt * 3); LS.ax += LS.vx * dt; LS.az += LS.vz * dt;
+  head.quaternion.copy(LS.q0).multiply(_q.setFromEuler(_e.set(LS.ax, 0, LS.az)));
+  // the card
+  FLIP.a = lerp(FLIP.a, FLIP.on * Math.PI, damp(dt, .09)); cardG.userData.flip.rotation.y = FLIP.a;
+  if (S.phase !== 'swap') { const pk = T - (S.binPeekT || -9), o = pk < 1.1 ? s01(pk / .15) * (1 - s01((pk - .8) / .2)) : 0; binG.userData.lid.rotation.x = -1.3 * o; binG.userData.pedal.rotation.x = .25 * o; }
+}
 function updUnpack(dt) {
   const t = S.phase === 'unpack' ? T - S.unpackT : 99; lab.visible = S.phase !== 'place';
   for (const [o, d] of PROPS) { if (!o.userData.y0 && o.userData.y0 !== 0) o.userData.y0 = o.position.y; const k = clamp((t - d) / .5, 0, 1); o.position.y = o.userData.y0 + (1 - outBack(k)) * .05; o.visible = k > 0 || o === trayG; if (o === trayG) o.scale.setScalar(lerp(.96, 1, s01(t / .4))); }
   const on = s01((t - 1.3) / .25) * (1 - (t > 1.3 && t < 1.42 ? .7 : 0));
-  spot.intensity = 2.6 * on; lampG.userData.inner.material.emissiveIntensity = on * .9; lampG.userData.bulb.visible = on > .05;
+  S.lampDim = lerp(S.lampDim ?? 1, S.phase === 'listen' ? .72 : 1, damp(dt, .3)); spot.intensity = 2.6 * on * S.lampDim * (1 + .7 * S.lampKick); for (const st of STAINS) { st.pulse = Math.max(0, (st.pulse || 0) - dt * 2.2); st.bl.uniforms.uK.value = .55 + st.pulse * 1.6; } lampG.userData.inner.material.emissiveIntensity = on * .9; lampG.userData.bulb.visible = on > .05;
   if (S.phase === 'unpack') { if (t > 1.3 && t - dt <= 1.3) sfx('tick', _v.set(CFG.LAMP.x, .2, CFG.LAMP.z)); if (t > 2.4) { musicStart(); startRound(); } }
 }
 function updCard() {
@@ -965,9 +1082,9 @@ function updCard() {
   if (p === 'unpack') card('Procedure', ['Watch the dish.', 'It will show you', 'colours.', '']);
   else if (p === 'listen') card('Watch the dish', [`${S.seq.length} colours, in order.`, '', '', S.stage ? `Culture: ${st}` : '']);
   else if (p === 'drip') card('Answer it', S.stage === 0 && S.round === 0 ? ['Pinch a dropper to', 'take it. Pinch again', 'for each drop.', 'Same order.'] : [`${S.step} of ${S.seq.length}.`, 'Same order.', '', `Culture: ${st}`]);
-  else if (p === 'dead' || p === 'swap') card('Culture lost', ['Wrong colour.', 'A fresh dish is', 'on its way.', '']);
-  else if (p === 'blight') card('Blight', ['Wrong colour.', 'The next good answer', 'will clear it.', '']);
-  else if (p === 'success' || p === 'grow') card(S.stage >= 6 ? 'They see you' : 'It lives', S.stage === 2 && !SC.over ? [`Culture: ${st}`, '', 'Swing the microscope', 'over and look in.'] : S.stage >= 5 ? [`Culture: ${st}`, '', 'Hold a finger over', 'the dish. Hum.'] : [`Culture: ${st}`, '', '', '']);
+  else if (p === 'dead' || p === 'swap') card('Culture lost', S.t > 1.2 || p === 'swap' ? [...S.cause, 'Next dish, please.'] : ['Oh dear.', '', '', '']);
+  else if (p === 'blight') card('Blight', ['Wrong colour. Mould.', 'The next good answer', 'will clear it.', '']);
+  else if (p === 'success' || p === 'grow') card(`Stage ${S.stage}: ${st}`, (S.stage >= 2 && S.stage <= 5 && !SC.over) ? [TAGS[S.stage], '', 'Swing the microscope', 'over the dish, look in.'] : S.stage >= 6 ? [TAGS[S.stage], '', 'Hold a finger over', 'the dish. Hum. Cheer.'] : [TAGS[S.stage], '', '', '']);
   else if (p === 'recog') card('They see you', ['They have made', 'something for you.', '', '']);
 }
 
@@ -978,9 +1095,10 @@ function loop(time, frame) {
   if (!renderer.xr.isPresenting) {
     if (S.phase === 'poster') { const a = Math.sin(T * .09) * .35 + .25; toWorld(camera.position.set(Math.sin(a) * .5, .3 + Math.sin(T * .07) * .02, Math.cos(a) * .5 + .03)); camera.lookAt(toWorld(_v.set(.0, .01, .0))); }
     else if (SIM) simCamera(dt);
+    if (DBG.cam) DBG.cam(camera);
     camera.updateMatrixWorld();
   }
-  updHands(dt); updPlace(dt, frame); updUnpack(dt); updPipettes(dt); updScope(dt); updDrops(dt);
+  updHands(dt); updPlace(dt, frame); updUnpack(dt); updTouch(dt); updPipettes(dt); updScope(dt); updDrops(dt);
   if (S.phase !== 'poster' && S.phase !== 'place' && S.phase !== 'unpack') updDish(dt); else { FLASH.i = 0; AG.uFlashI.value = 0; AG.uGlyphI.value = 0; }
   updField(dt); updVoice(dt); updLife(dt); updCard(); updAudio(); if (SIM) simDraw();
   DIM.uA.value = renderer.xr.isPresenting ? lerp(DIM.uA.value, S.phase === 'place' ? .12 : CFG.DIM, damp(dt, .8)) : 0; dimmer.visible = renderer.xr.isPresenting || SC.view > .01; camera.getWorldPosition(dimmer.position);
@@ -992,7 +1110,7 @@ function loop(time, frame) {
 
 // ═══════════════════════════ SESSION ═══════════════════════════
 function resetAll(demo) {
-  for (const p of PIPS) { if (p.hand) p.hand.hold = null; pipHome(p); p.squash = 0; p.beadT = -1; p.bead.visible = false; }
+  for (const p of PIPS) { if (p.hand) p.hand.hold = null; pipHome(p); p.fv = CFG.DROPS; p.squash = 0; p.beadT = -1; p.bead.visible = false; }
   for (const d of DROPS) lab.remove(d.m); DROPS.length = SPLASH.length = SPLATS.length = RINGS.length = PUFFS.length = 0;
   lifeReset(); fieldReset(); Object.assign(S, { stage: 0, round: 0, seq: [], step: 0, mix: [0, 0, 0], drops: [], blight: false, recognised: false, cureT: 0 });
   AG.uDead.value.set(0, 0, 0, 0); AG.uDeadF.value = 0; AG.uColony.value = 0; SC.theta = SC.tgt = CFG.SCOPE.park; SC.drag = null; dishG.position.set(CFG.DISH.x, 0, CFG.DISH.z); dishG.rotation.set(0, 0, 0); dishG.visible = true; stack.forEach(s => { s.visible = true; });
@@ -1024,7 +1142,7 @@ $('go').onclick = async () => {
 // mouse = your pinch over the tray · wheel = height · hold the button = pinch · M = look into the microscope · H = hum (mouse x = pitch) · L = shout · K = clap
 const simRay = new THREE.Raycaster(), mouse = new THREE.Vector2(); let simH = .12;
 const simHand = new THREE.Group(); { const m = std(PAL.bone, .5); for (const s of [-1, 1]) mesh(new THREE.SphereGeometry(.0055, 16, 12), m, simHand, { p: [s * .01, 0, 0], cast: true }); mesh(new THREE.TorusGeometry(.016, .0008, 6, 32), M.brass, simHand, { r: [Math.PI / 2, 0, 0], cast: false }); } lab.add(simHand); simHand.visible = false;
-function simCamera(dt) { const look = SC.view; camera.position.copy(toWorld(_v.set(0, .4, .46))); camera.lookAt(toWorld(_v2.set(0, .02, -.02)));
+function simCamera(dt) { const look = SC.view; camera.position.copy(toWorld(_v.set(.07, .42, .5))); camera.lookAt(toWorld(_v2.set(.06, .03, -.02)));
   if (look > .001) { const eye = _v3.copy(SC.eye).addScaledVector(SC.eyeAxis, -.03); camera.position.lerp(eye, s01(look)); _q.copy(camera.quaternion); camera.lookAt(_v.copy(SC.eye).addScaledVector(SC.eyeAxis, 1)); camera.quaternion.slerpQuaternions(_q, camera.quaternion.clone(), s01(look)); } }
 function simDraw() { const h = PH[0]; simHand.visible = S.phase !== 'poster' && SC.view < .5; simHand.position.copy(h.sim.p); const k = h.sim.pinch ? .35 : 1; simHand.children[0].position.x = -.01 * k; simHand.children[1].position.x = .01 * k; }
 if (SIM) {
@@ -1045,8 +1163,8 @@ window.__T = { S, L, PH, PIPS, SC, VO, AG, CFG, DBG, go, drip, answer, begin, fa
 (async () => {
   try { const g = await new GLTFLoader().loadAsync('assets/hand-right.glb'); const sk = g.scene.getObjectByProperty('type', 'SkinnedMesh'); // the monument: your hand, from the same mesh that hides your real one
     const geo = sk.geometry.clone(); geo.deleteAttribute('skinIndex'); geo.deleteAttribute('skinWeight'); geo.computeBoundingBox(); const bb = geo.boundingBox, sz = bb.getSize(new V()), ax = sz.x > sz.y ? (sz.x > sz.z ? 'x' : 'z') : (sz.y > sz.z ? 'y' : 'z');
-    if (ax === 'z') geo.rotateX(-Math.PI / 2); else if (ax === 'x') geo.rotateZ(Math.PI / 2); geo.computeBoundingBox(); const b2 = geo.boundingBox, c = b2.getCenter(new V()); geo.translate(-c.x, -b2.min.y, -c.z); const s = .032 / (b2.max.y - b2.min.y); geo.scale(s, s, s);
-    const hm = mesh(geo, std(PAL.brass, .28, 1, { envMapIntensity: 1.2 }), monG, { p: [0, .006, 0] }); hm.userData.flip = true; } catch (e) { }
+    if (ax === 'z') geo.rotateX(-Math.PI / 2); else if (ax === 'x') geo.rotateZ(Math.PI / 2); geo.computeBoundingBox(); const b2 = geo.boundingBox, c = b2.getCenter(new V()); geo.translate(-c.x, -b2.min.y, -c.z); const s = .044 / (b2.max.y - b2.min.y); geo.scale(s, s, s);
+    const hm = mesh(geo, std(PAL.brass, .25, .85, { envMapIntensity: 1.4, emissive: new C('#8a5a1c'), emissiveIntensity: .55 }), monG, { p: [0, .006, 0] }); hm.userData.flip = true; } catch (e) { }
   placeLab(new V(0, CFG.HOME.y, 0), 0); resetAll(true); setPhase('poster'); framePoster(); card('Culture No. 1', ['Day 12. They have', 'built a town.', '', '']);
   { const hidden = []; scene.traverse(o => { if (!o.visible) { hidden.push(o); o.visible = true; } }); try { renderer.compile(scene, camera); } catch (e) { } hidden.forEach(o => { o.visible = false; }); }
   renderer.setAnimationLoop(loop);
