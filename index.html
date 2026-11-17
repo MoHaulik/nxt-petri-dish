@@ -108,7 +108,7 @@ const CFG = {
   PINCH: { on: .02, gap: .02, cap: .035 }, HOVER: { on: .06, off: .09 }, // thumb-to-index metres; hysteresis after Meta's grab spec, a little looser for raw joints
   DROPS: 8, STEP_TIMEOUT: 10, DIM: .3,
   ROUNDS: [3, 4, 4, 5, 5, 6, 6], // sequence length per round; a success in round n brings stage n+1
-  HOME: { y: .74 }, GOD_TIME: 88, // seconds of town life after they recognise you, before they need more room
+  HOME: { y: .74 }, GOD_TIME: 78, // seconds of town life after they recognise you, before they need more room
  // ?sim / poster desk height
 };
 const STAINS = [
@@ -1336,8 +1336,8 @@ function drawEnd(stage) { const c = endT.image, g = c.getContext('2d'), w = c.wi
   g.fillStyle = '#2a2520'; for (let y = 18; y < h; y += 52) { g.fillRect(14, y, 26, 30); g.fillRect(w - 40, y, 26, 30); } // sprocket holes
   g.strokeStyle = 'rgba(239,230,207,.07)'; for (let i = 0; i < 9; i++) { g.lineWidth = rand(.5, 2); const x = rand(60, w - 60); g.beginPath(); g.moveTo(x, 0); g.lineTo(x + rand(-12, 12), h); g.stroke(); } // scratches
   g.fillStyle = PAL.cream; g.textAlign = 'center';
-  if (stage === 0) { g.font = 'italic 400 40px "Courier Prime"'; g.fillText('And so,', w / 2, 170); g.font = '500 76px Jost'; g.fillText('THE GREY GOO', w / 2, 290); g.font = '500 48px Jost'; g.fillText('TOOK OVER THE WORLD.', w / 2, 370); g.font = 'italic 400 28px "Courier Prime"'; g.fillStyle = 'rgba(239,230,207,.6)'; g.fillText('(It was mostly beige. It loved you very much.)', w / 2, 450); }
-  else { g.fillStyle = PAL.rule; g.fillRect(w / 2 - 170, 196, 340, 4); g.fillStyle = PAL.cream; g.font = '500 110px Jost'; g.fillText('THE END', w / 2, 170 + 0); g.font = '400 30px Oswald'; g.fillStyle = PAL.brass; g.fillText('A  BELL-STYLE  CAUTIONARY  REEL', w / 2, 262); g.fillStyle = PAL.cream; g.font = 'italic 400 34px "Courier Prime"'; g.fillText('Pinch, or click, to start a fresh culture.', w / 2, 420); g.font = '400 22px "Geist Mono", monospace'; g.fillStyle = 'rgba(239,230,207,.45)'; g.fillText('A NXT/WebXR PRODUCTION', w / 2, 560); }
+  if (stage === 0) { g.font = 'italic 400 40px "Courier Prime"'; g.fillText('And so,', w / 2, 170); g.font = '500 76px Jost'; g.fillText('THE GREY GOO', w / 2, 290); g.font = '500 48px Jost'; g.fillText('TOOK OVER THE WORLD.', w / 2, 370); g.font = 'italic 400 28px "Courier Prime"'; g.fillStyle = 'rgba(239,230,207,.6)'; g.fillText('It loved you very, very much.', w / 2, 450); }
+  else { g.fillStyle = PAL.rule; g.fillRect(w / 2 - 170, 196, 340, 4); g.fillStyle = PAL.cream; g.font = '500 110px Jost'; g.fillText('THE END', w / 2, 170 + 0); g.font = '400 30px Oswald'; g.fillStyle = PAL.brass; g.fillText('A  BELL-STYLE  CAUTIONARY  REEL', w / 2, 262); g.fillStyle = 'rgba(239,230,207,.75)'; g.font = 'italic 400 30px "Courier Prime"'; g.fillText('Next week: Why We Label Our Reagents.', w / 2, 352); g.fillStyle = PAL.cream; g.font = 'italic 400 34px "Courier Prime"'; g.fillText('Pinch, or click, to start a fresh culture.', w / 2, 440); g.font = '400 22px "Geist Mono", monospace'; g.fillStyle = 'rgba(239,230,207,.45)'; g.fillText('A NXT/WebXR PRODUCTION', w / 2, 560); }
   endT.needsUpdate = true; }
 const FIN = { on: false, t: 0, R: 0, c: new V(), hand: [0, 0], vis: 0, flags: 0, chant: 0, H: [] };
 const EXP = [{ x: CFG.STACK.x, z: CFG.STACK.z + .005 }, { x: .172, z: .102 }].map((e, k) => { const g = grp(lab, e.x, 0, e.z); glassMesh(dishGeo, g); const a = mesh(agarGeo, agarMat, g, { cast: false }); a.rotation.y = 1.7 + k * 2.1; mesh(agarSideGeo, agarMat, g, { cast: false }); g.visible = false; return { ...e, g, bridge: null }; });
@@ -1366,7 +1366,7 @@ function updFinale(dt) {
     FIN.R = t < 6 ? lerp(0, .075, s01(t / 6)) : t < 20 ? lerp(.075, .5, (t - 6) / 14) : lerp(.5, 1.3, Math.min(1, (t - 20) / 12));
     toWorld(GOO.uGooC.value.copy(FIN.c)); GOO.uGooR.value = FIN.R; GOO.uGrey.value = s01((t - 14) / 18) * .6;
     MUS.det = Math.min(80, t * 3); MUS.slow = Math.min(.35, t * .012);
-    const caps = [[0, 'Then one of them had an idea.'], [4.5, 'The idea was: more of us.'], [9, 'Everybody agreed.'], [14, 'They wished to thank their Creator. Personally.'], [19, 'A responsible scientist would now wash their hands.'], [23.5, 'Too late.'], [28, 'They loved you very, very much.'], [35, 'Hold still. They are nearly finished.'], [41.5, 'There.']];
+    const caps = [[0, 'Then one of them had an idea.'], [4.5, 'The idea was: more of us.'], [9, 'It was a very popular idea.'], [14, 'They wished to thank their Creator. In person.'], [19, 'All of them. In person.'], [23.5, 'A responsible scientist would now wash their hands.'], [27.5, "The scientist's hands were busy being adored."], [31.5, 'Hold still...'], [35.5, 'This must be what true love feels like.'], [41, 'Overwhelming.']];
     let cap = ''; for (const [ct, tx] of caps) if (t >= ct) cap = tx; caption(cap);
     card('Procedure', t < 9 ? ['Hm.', '', '', ''] : ['Oh dear.', '', '', '']);
     // the old town: delighted, then briefly "oh no", then delighted again
@@ -1377,11 +1377,11 @@ function updFinale(dt) {
     // hands: they arrive when the tide reaches a hand, or leap at 18 s regardless
     for (const h of PH) { const d = h.tracked ? Math.hypot(h.tip.x - FIN.c.x, h.tip.z - FIN.c.z) : 9; if (d < FIN.R * .9 || t > 16) FIN.hand[h.i] = Math.min(1, FIN.hand[h.i] + dt / 9); }
     { const k = clamp((t - 24) / 20, 0, 1); FIN.vis = k * .62 + k * k * .38; } VIS.uV.value = FIN.vis; VIS.uBlack.value = s01((t - 44.3) / 1.4); visGoo.visible = FIN.vis > 0;
-    if (t > 46) { setPhase('end'); drawEnd(0); endM.visible = true; caption(''); musicStop(); MUS.det = 0; sfx('tada', null); } }
+    if (t > 46.5) { setPhase('end'); drawEnd(0); endM.visible = true; caption(''); musicStop(); MUS.det = 0; sfx('tada', null); } }
   if (p === 'end') { visGoo.visible = true; VIS.uBlack.value = 1; VIS.uV.value = 1; endM.material.opacity = s01(t / .8) * (.9 + .1 * Math.random()) * (1 - s01((t - 6.6) / .4) * (t < 7 ? 1 : 0)); if (t > 7 && t - dt <= 7) drawEnd(1); if (t > 7) endM.material.opacity = s01((t - 7) / .5) * (.92 + .08 * Math.random());
     if (Math.random() < dt * 24 && A.ctx) noiseHit(now(), .02, 2200, 2, .015, A.sfx); // the projector
     if (t > 8.5 && (PH.some(h => h.down) || FIN.click)) restart(); }
-  camera.getWorldDirection(VIS.uFwd.value); camera.getWorldPosition(visGoo.position);
+  camera.getWorldDirection(VIS.uFwd.value); camera.getWorldPosition(visGoo.position); if (TEL.built) teleTrack(dt);
   updHorde(dt);
 }
 function creator() { if (!A.ctx) return; const t = now(), d = out(dishPan(), .3), k = rand(.85, 1.2); [[2600, 0], [2200, .09], [3000, .2]].forEach(([f, o]) => { const g = A.ctx.createGain(), os = A.ctx.createOscillator(); os.frequency.setValueAtTime(f * k, t + o); os.frequency.exponentialRampToValueAtTime(f * k * (o > .15 ? 1.15 : .95), t + o + .07); env(g, t + o, .005, .035, .08); os.connect(g).connect(d); os.start(t + o); os.stop(t + o + .12); }); } // "cre-a-TOR!"
@@ -1415,13 +1415,14 @@ function updHorde(dt) {
         if (k % 9 === 0 && nf < 48) { _o.position.copy(_hp).addScaledVector(up, .013); _o.lookAt(cam); _o.rotateZ(Math.sin(T * 4 + k) * .3); _o.scale.setScalar(1.3); _o.updateMatrix(); FLAGS.setMatrixAt(nf, _o.matrix); FLAGS.setColorAt(nf, STAINS[(k / 9 | 0) % 3].c); nf++; } } }
     FLAGS.count = nf; FLAGS.instanceMatrix.needsUpdate = true; if (nf) FLAGS.instanceColor.needsUpdate = true;
   } else if (S.phase === 'sprawl') { FLAGS.count = 0; n = updSettlers(n, cam); }
+  if (TEL.built && (S.phase === 'sprawl' || S.phase === 'goo')) n = telescopeCrowd(n, cam);
   else FLAGS.count = 0;
   HORDE.count = HCREST.count = n; for (const m of [HORDE, HCREST]) { m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; }
 }
 // the sprawl: after the suburbs, outposts on the tray and settlements on the furniture, steady at first, then "hm, that's a lot"
 function buildSettlements() { const B = CFG.BIN, R = CFG.RACK, SC0 = CFG.SCOPE, LP = CFG.LAMP;
   FIN.sets = [[-.07, 0, .145, .02], [.07, 0, .148, .018], [.0, 0, -.125, .02], [.09, 0, -.13, .016], [.235, 0, -.125, .014], [-.245, 0, -.02, .012], [.0, 0, .155, .012],
-    [R.x - .022, .089, R.z - .012, .006], [R.x + .022, .089, R.z - .012, .006], [SC0.x, .022, SC0.z + .01, .02], [LP.x, .017, LP.z, .022], [B.x, B.h - CFG.TRAY.base + .024, B.z, .045], [-.12, 0, .06, .012]]
+    [R.x - .022, .089, R.z - .012, .006], [R.x + .022, .089, R.z - .012, .006], [SC0.x, .022, SC0.z + .01, .02], [LP.x, .017, LP.z, .022], [-.12, 0, .06, .012]]
     .map(([x, y, z, r], k) => ({ x, y, z, r, k }));
   FIN.spawn = 0; FIN.pop = L.beings.length + 44; }
 function settle(st, t) { const a = Math.random() * 6.283, rr = Math.sqrt(Math.random()) * st.r, x = st.x + Math.cos(a) * rr - CFG.DISH.x, z = st.z + Math.sin(a) * rr - CFG.DISH.z, y = st.y - CFG.DISH.agar + .0001, lin = lineage(), r = Math.random();
@@ -1429,17 +1430,18 @@ function settle(st, t) { const a = Math.random() * 6.283, rr = Math.sqrt(Math.ra
   else if (r < .85 && L.roofs.length < 58) L.roofs.push({ x, y, z, s: rand(.0035, .0055), ry: Math.random() * 6, lin, born: T });
   else if (L.spires.length < 58) L.spires.push({ x, y, z, h: rand(.008, .014), lin, born: T, star: true, lit: 1 }); }
 function updSprawl(dt, t) {
-  const unlocked = Math.min(FIN.sets.length, 3 + Math.floor(t / 3)), rate = .6 + .045 * t * t; FIN.spawn += dt * rate;
+  const tg = t < 7 ? t : t < 30 ? 7 + (t - 7) * .35 : 15 + (t - 30) * 1.3, unlocked = Math.min(FIN.sets.length, 3 + Math.floor(tg / 3)), rate = .6 + .045 * tg * tg; // growth idles while they build the telescope, then resumes and runs away FIN.spawn += dt * rate;
   while (FIN.spawn > 1) { FIN.spawn--; settle(FIN.sets[Math.floor(Math.pow(Math.random(), 1.3) * unlocked)], t); if (Math.random() < .3) say(rand(2600, 3400), .03); }
-  FIN.pop *= 1 + dt * (t < 20 ? .04 : .04 + (t - 20) * .03); // steady, then not
-  const caps = [[0, 'The suburbs filled up nicely.'], [8, 'Then the outskirts.'], [16, 'Then the furniture.'], [24, 'Hm. That is quite a lot.'], [30, 'That is a very great deal.']];
+  FIN.pop *= 1 + dt * (tg < 20 ? .04 : .04 + (tg - 20) * .03); // steady, then not
+  updTelescope(dt, t - 7);
+  const caps = [[0, 'The suburbs filled up nicely.'], [4, 'Then the outskirts.'], [7, 'They wondered what you were.'], [11, 'So they built an instrument.'], [16.5, 'It is pointed at you.'], [21, 'First observation: the Creator is upside down.'], [25, 'Second observation: the Creator is wearing a box.'], [29.5, 'Science marches on.'], [33, 'Then the furniture.'], [38.5, 'Hm. That is quite a lot.'], [43.5, 'That is a very great deal.']];
   let cap = ''; for (const [ct, tx] of caps) if (t >= ct) cap = tx; caption(cap);
-  card('Census', [`Population: ${Math.round(FIN.pop).toLocaleString('en-US')}`, t < 16 ? 'Steady growth.' : t < 24 ? 'Healthy growth.' : 'Growth.', t < 24 ? 'Spirits: excellent.' : 'Spirits: excellent!!', '']);
-  if (t > 11 && t - dt <= 11) { fireworks(3); fanfare(); } if (t > 21 && t - dt <= 21) { fireworks(5); cheer(); }
-  MUS.slow = Math.max(0, (t - 24) * .006);
-  if (t > 35) { setPhase('goo'); FIN.c.set(EXP[1].x, CFG.DISH.agar, EXP[1].z); FIN.R = 0; deskGoo.visible = true; } }
+  if (t < 7 || t > 31) card('Census', [`Population: ${Math.round(FIN.pop).toLocaleString('en-US')}`, t < 16 ? 'Steady growth.' : t < 24 ? 'Healthy growth.' : 'Growth.', t < 24 ? 'Spirits: excellent.' : 'Spirits: excellent!!', '']);
+  if (t > 33 && t - dt <= 33) { fireworks(3); fanfare(); } if (t > 41 && t - dt <= 41) { fireworks(5); cheer(); }
+  MUS.slow = Math.max(0, (t - 37) * .006);
+  if (t > 48) { setPhase('goo'); FIN.c.set(EXP[1].x, CFG.DISH.agar, EXP[1].z); FIN.R = 0; deskGoo.visible = true; } }
 function updSettlers(n, cam) { // little citizens walking out from the dishes to the settlements: a handful, then a stream, then a crowd
-  const t = S.t, m = Math.min(300, Math.floor(6 + 3 * t + .22 * t * t)), sets = FIN.sets, unlocked = Math.min(sets.length, 3 + Math.floor(t / 3)), homes = [[CFG.DISH.x, CFG.DISH.z], ...EXP.map(e => [e.x, e.z])];
+  const t0 = S.t, t = t0 < 7 ? t0 : t0 < 30 ? 7 + (t0 - 7) * .35 : 15 + (t0 - 30) * 1.3, m = Math.min(260, Math.floor(6 + 3 * t + .22 * t * t)), sets = FIN.sets, unlocked = Math.min(sets.length, 3 + Math.floor(t / 3)), homes = [[CFG.DISH.x, CFG.DISH.z], ...EXP.map(e => [e.x, e.z])];
   for (let k = 0; k < m && n < HN; k++) { const st = sets[(k * 7) % unlocked], h = homes[k % 3], f = (T * (.035 + (k % 5) * .006) + k * .1373) % 1, dx = st.x - h[0], dz = st.z - h[1], d = Math.hypot(dx, dz) + 1e-5;
     const sx = h[0] + dx / d * DR, sz = h[1] + dz / d * DR; const ex = st.x - dx / d * st.r * .6, ez = st.z - dz / d * st.r * .6;
     _hp.set(lerp(sx, ex, f), lerp(CFG.DISH.agar, st.y, s01(f)) + (st.y > .01 ? 0 : .0), lerp(sz, ez, f)); toWorld(_hp);
@@ -1458,7 +1460,74 @@ function bakeCrowd() {
   const rt = new THREE.WebGLRenderTarget(512, 512, { samples: 4 }); rt.texture.wrapS = rt.texture.wrapT = THREE.RepeatWrapping; rt.texture.generateMipmaps = true; rt.texture.minFilter = THREE.LinearMipmapLinearFilter; rt.texture.anisotropy = 8;
   const prev = renderer.getRenderTarget(); renderer.setRenderTarget(rt); renderer.setClearColor(0x6b5c45, 1); renderer.clear(); renderer.render(sc, cam); renderer.setClearColor(0x000000, 0); renderer.setRenderTarget(prev);
   GOO.uCrowd.value = rt.texture; }
-function restart() { FIN.on = false; FIN.cardK = 0; FIN.click = false; FIN.hand = [0, 0]; FIN.flags = 0; FIN.vis = 0; GOO.uGooR.value = 0; GOO.uGrey.value = 0; VIS.uV.value = VIS.uBlack.value = 0; visGoo.visible = endM.visible = deskGoo.visible = false; caption(''); MUS.det = 0; MUS.slow = 0;
+// ═══════════════════════════ THE OBSERVATORY: on the bin lid they build a telescope, aim it at your real head, and project what they see ═══════════════════════════
+const TEL = { built: false, tt: -1, aimed: 0, screen: 0, peek: 0, q: new Qn() };
+const teleG = grp(lab, CFG.BIN.x, CFG.BIN.h - CFG.TRAY.base + .024, CFG.BIN.z); teleG.visible = false;
+mesh(new THREE.CylinderGeometry(.021, .022, .003, 32), M.walnut, teleG, { p: [0, .0015, 0] });
+const telePoles = [[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([a, b]) => mesh(new THREE.CylinderGeometry(.0007, .0007, .03, 5).translate(0, .015, 0), M.walnut, teleG, { p: [a * .012, .003, b * .012] }));
+const teleRings = [.014, .029].map(y => mesh(new THREE.TorusGeometry(.017, .0006, 4, 24), M.walnut, teleG, { p: [0, y, 0], r: [Math.PI / 2, 0, 0], cast: false }));
+const teleFork = mesh(new THREE.BoxGeometry(.012, .004, .006), M.brass, teleG, { p: [0, .032, 0] });
+const telePivot = grp(teleG, 0, .036, 0), teleTube = grp(telePivot);
+mesh(new THREE.CylinderGeometry(.0055, .0048, .056, 20).rotateX(Math.PI / 2), M.crinkle, teleTube, { p: [0, 0, .006] });
+mesh(new THREE.TorusGeometry(.0058, .0009, 6, 20), M.brass, teleTube, { p: [0, 0, .034] }); mesh(new THREE.CylinderGeometry(.0018, .0022, .01, 10).rotateX(Math.PI / 2), M.brass, teleTube, { p: [0, 0, -.026] });
+const teleLens = mesh(new THREE.CircleGeometry(.0048, 20), new THREE.MeshStandardMaterial({ color: '#cfe6ff', metalness: .2, roughness: .05, emissive: new C('#8fb9e8'), emissiveIntensity: .5 }), lab, { cast: false });
+const teleCrank = mesh(new THREE.TorusGeometry(.005, .0008, 4, 12), M.brass, teleG, { p: [.016, .012, .0] , r: [0, Math.PI / 2, 0] });
+// the screen: a little projection sheet beside it, showing you as they see you (upside down: it is a telescope)
+const teleRT = new THREE.WebGLRenderTarget(256, 256, { samples: 2 }), teleCam = new THREE.PerspectiveCamera(30, 1, .05, 3); teleCam.layers.enable(7); scene.add(teleCam); { const fl = new THREE.PointLight('#ffe2b8', 2.2, 2, 1); fl.layers.set(7); fl.position.set(.05, .08, 0); teleCam.add(fl); const am = new THREE.AmbientLight('#c8b8a0', .5); am.layers.set(7); scene.add(am); } // light only the telescope sees
+const screenG = grp(teleG, -.026, 0, .022); screenG.visible = false;
+for (const s of [-1, 1]) mesh(new THREE.CylinderGeometry(.0005, .0005, .044, 5).translate(0, .022, 0), M.walnut, screenG, { p: [s * .019, 0, 0] });
+const SCR = { uMap: { value: teleRT.texture }, uOn: { value: 0 }, uT: U.time };
+const screenM = mesh(new THREE.PlaneGeometry(.036, .026), new THREE.ShaderMaterial({ uniforms: SCR, vertexShader: `varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+  fragmentShader: `uniform sampler2D uMap;uniform float uOn,uT;varying vec2 vUv;float h(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
+    void main(){vec2 p=(vUv-.5)*vec2(1.38,1.);float r=length(p);vec2 q=p*(1.+.9*r*r)*.95;vec2 uv=vec2(.5-q.x,.5-q.y);   // barrel-distorted and upside down
+      vec3 c=texture2D(uMap,clamp(uv,0.,1.)).rgb;c=mix(vec3(dot(c,vec3(.3,.55,.15))),c,.55)*vec3(1.05,.98,.85);c*=smoothstep(.5,.42,r)*(.92+.08*h(vec2(floor(uT*18.))))*uOn;
+      vec3 sheet=vec3(.93,.9,.82);gl_FragColor=vec4(mix(sheet*.55,sheet*.25+c*1.25,smoothstep(.5,.46,r)*uOn+.0)+(1.-uOn)*sheet*.35,1.);${OUT}}` }), screenG, { p: [0, .03, 0], cast: false });
+// you, as the telescope sees you: a stand-in that follows your real head (only the telescope can see it, on layer 7). They have given you a crest.
+const youG = new THREE.Group(); scene.add(youG);
+{ const add = (geo, mat, p, r) => { const m = new THREE.Mesh(geo, mat); if (p) m.position.set(...p); if (r) m.rotation.set(...r); m.layers.set(7); youG.add(m); return m; };
+  add(new THREE.SphereGeometry(.095, 24, 18), std('#e8c9a8', .7), [0, 0, 0]); add(new THREE.BoxGeometry(.17, .095, .09), std('#2c2b29', .45), [0, .005, -.075]);
+  add(new THREE.TorusGeometry(.098, .012, 6, 28), std('#1c1b19', .6), [0, .01, 0], [Math.PI / 2, 0, 0]);
+  for (const s of [-1, 1]) add(new THREE.SphereGeometry(.014, 10, 8), new THREE.MeshBasicMaterial({ color: '#ffffff' }), [s * .035, .012, -.121]);
+  for (const s of [-1, 1]) add(new THREE.SphereGeometry(.0065, 8, 6), new THREE.MeshBasicMaterial({ color: '#1c1b19' }), [s * .033, .009, -.133]);
+  youG.userData.crest = add(new THREE.ConeGeometry(.03, .1, 10), std('#46C27A', .5), [0, .1, .02], [-.4, 0, 0]); }
+function updTelescope(dt, tt) { // tt: seconds since they started building
+  if (tt < 0) return; teleG.visible = true; TEL.tt = tt;
+  telePoles.forEach((p, k) => { p.scale.y = Math.max(.001, s01((tt - k * .5) / 1.2)); }); teleRings.forEach((r, k) => { r.visible = tt > 2.5 + k; r.scale.setScalar(s01((tt - 2.5 - k) / .6) + .001); });
+  teleFork.visible = tt > 4; telePivot.position.y = tt < 4 ? .004 : lerp(.004, .036, s01((tt - 4) / 2.5)); telePivot.visible = tt > 3.5; // the tube is hoisted up the scaffold
+  if (tt > 3.5 && tt - dt <= 3.5) sfx('pedal', null);
+  if (tt > 9 && tt < 12.5) { if (Math.floor(tt * 6) !== Math.floor((tt - dt) * 6)) { noiseHit(now(), .02, 3200, 3, .05, A.sfx); TEL.aimed = Math.min(1, TEL.aimed + .09); } teleCrank.rotation.x += dt * 9; } // cranking it round, click by click
+  if (tt >= 12.5) TEL.aimed = 1; TEL.built = tt > 9;
+  if (tt > 12.6 && tt - dt <= 12.6) { vibe(1318.5, now(), .1, null, 1); }
+  if (tt > 14 && tt - dt <= 14) { screenG.visible = true; sfx('tick', null); for (const b of L.beings) if (Math.random() < .5) { b.act = 'startle'; b.actT = 1.4; } say(3400, .06); }
+  SCR.uOn.value = s01((tt - 14) / .6) * (tt > 14 && tt < 14.6 ? (Math.random() < .5 ? .3 : 1) : 1);
+  if (tt > 18 && tt - dt <= 18) { cheer(); fireworks(2); } if (tt > 22.5 && tt - dt <= 22.5) say(2200, .06);
+  screenG.position.y = lerp(-.04, 0, s01((tt - 13.4) / .6)); if (!screenG.visible) screenG.position.y = -.04;
+  card('Observatory', ['Instrument: telescope.', 'Subject: you.', tt > 14 ? 'Findings: see sheet.' : '', '']);
+}
+function teleTrack(dt) { // aim at your real head; the screen turns to face you; the stand-in follows you
+  camera.getWorldPosition(_v); camera.getWorldQuaternion(_q); youG.position.copy(_v); youG.quaternion.copy(_q); youG.userData.crest.material.color.copy(STAINS[favStain()].c);
+  telePivot.getWorldPosition(_v2); _m.lookAt(_v2, _v, UP); const want = _q.setFromRotationMatrix(_m); // world rotation pointing -z at the head
+  _q2.copy(teleG.getWorldQuaternion(new Qn())).invert().multiply(want); const parked = new Qn().setFromEuler(new THREE.Euler(-.5, 0, 0));
+  const k = TEL.aimed; const tgt = parked.slerp(_q2.multiply(new Qn().setFromAxisAngle(UP, Math.PI)), k); teleTube.quaternion.slerp(tgt, damp(dt, k >= 1 ? .25 : .05));
+  teleTube.updateMatrixWorld(true); teleTube.localToWorld(_v3.set(0, 0, .034)); toLab(teleLens.position.copy(_v3)); teleLens.visible = true; teleLens.lookAt(_v);
+  screenG.getWorldPosition(_v3); const yaw = Math.atan2(_v.x - _v3.x, _v.z - _v3.z); screenG.rotation.y = yaw - teleG.getWorldQuaternion(new Qn()).angleTo(new Qn()) * 0 - lab.rotation.y;
+  teleCam.position.copy(_v3.set(0, 0, .04).applyMatrix4(teleTube.matrixWorld)); teleCam.lookAt(_v); }
+const _q2 = new Qn();
+function renderTele() { if (!(SCR.uOn.value > .01) || !screenG.visible) return; if ((TEL.frame = (TEL.frame || 0) + 1) % 2) return;
+  const xr = renderer.xr.enabled, rt = renderer.getRenderTarget(), tm = renderer.toneMapping, su = renderer.shadowMap.autoUpdate;
+  for (const o of naked) o.visible = false; eyeDisc.visible = false; dimmer.visible = false; const vg = visGoo.visible; visGoo.visible = false; capM.visible = false; const ev = endM.visible; endM.visible = false;
+  renderer.xr.enabled = false; renderer.shadowMap.autoUpdate = false; renderer.toneMapping = THREE.NoToneMapping;
+  renderer.setRenderTarget(teleRT); renderer.setClearColor(0x141a26, 1); renderer.clear(); renderer.render(scene, teleCam);
+  renderer.setClearColor(0x000000, 0); renderer.setRenderTarget(rt); renderer.xr.enabled = xr; renderer.shadowMap.autoUpdate = su; renderer.toneMapping = tm;
+  for (const o of naked) o.visible = true; visGoo.visible = vg; capM.visible = !!capKey; endM.visible = ev; dimmer.visible = renderer.xr.isPresenting || SC.view > .01; }
+function telescopeCrowd(n, cam) { // two cranking, one climbing to the eyepiece, a little audience at the sheet
+  const tt = TEL.tt, b = new V(); teleG.getWorldPosition(b);
+  const put = (x, y, z, look, size = .0052, jump = 0, c = STAINS[0].c) => { _hp.set(x, y, z).applyQuaternion(lab.quaternion).add(b); hordeAdd(n++, _hp, size, look, jump, c); };
+  const head = _v.copy(cam); for (let k = 0; k < 2; k++) put(.018 + k * .004, .003, k ? .006 : -.006, _v2.set(b.x, b.y, b.z), .0052, Math.abs(Math.sin(T * 9 + k * 3)) * .0012, STAINS[k + 1].c);
+  if (tt > 12.5) { const k = s01((tt - 12.5) / 1.2); teleTube.updateMatrixWorld(true); const eye = new V(0, 0, -.032).applyMatrix4(teleTube.matrixWorld); _hp.copy(b).add(_v4.set(-.012, .003, -.012).applyQuaternion(lab.quaternion)).lerp(eye.add(_v4.set(0, -.006, 0)), k); hordeAdd(n++, _hp, .0052, head, 0, STAINS[2].c); }
+  if (tt > 14) for (let k = 0; k < 9; k++) { const a = k / 8 * 1.6 - .8; put(-.026 + Math.sin(a) * .016, .003, .006 - Math.cos(a) * .004 + .0, _v2.copy(screenG.getWorldPosition(new V())), .0052, (tt > 14 && tt < 16) || (tt > 18 && tt < 20) ? Math.abs(Math.sin(T * 10 + k)) * .003 : 0, STAINS[k % 3].c); }
+  return n; }
+function restart() { teleG.visible = screenG.visible = teleLens.visible = false; TEL.built = false; TEL.aimed = 0; SCR.uOn.value = 0; FIN.on = false; FIN.cardK = 0; FIN.click = false; FIN.hand = [0, 0]; FIN.flags = 0; FIN.vis = 0; GOO.uGooR.value = 0; GOO.uGrey.value = 0; VIS.uV.value = VIS.uBlack.value = 0; visGoo.visible = endM.visible = deskGoo.visible = false; caption(''); MUS.det = 0; MUS.slow = 0;
   EXP.forEach(e => { e.g.visible = false; if (e.bridge) { lifeG.remove(e.bridge); e.bridge = null; } }); cardG.visible = true; cardG.position.set(CFG.CARD.x, 0, CFG.CARD.z); cardG.rotation.y = -.42; lifeG.visible = true; HORDE.count = HCREST.count = FLAGS.count = 0;
   resetAll(false); setPhase('unpack'); S.unpackT = T - 1.2; }
 // ═══════════════════════════ LOOP ═══════════════════════════
@@ -1477,7 +1546,7 @@ function loop(time, frame) {
   DIM.uA.value = renderer.xr.isPresenting ? lerp(DIM.uA.value, S.phase === 'place' ? .12 : S.night ? .62 : CFG.DIM, damp(dt, .8)) : 0; dimmer.visible = renderer.xr.isPresenting || SC.view > .01; camera.getWorldPosition(dimmer.position);
   lampG.userData.head.getWorldPosition(lampPos); lampPos.y -= .01;
   glow.flush(); soot.flush(); micro.flush();
-  renderMicro();
+  renderMicro(); renderTele();
   renderer.render(scene, camera);
 }
 
