@@ -208,7 +208,7 @@ function glassMat(o = {}) {
     fragmentShader: `uniform sampler2D uEnv;uniform vec3 uLamp,uLampC,uTint;uniform float uA,uEnvI;varying vec3 vW,vN;${EQ}
       void main(){vec3 N=normalize(vN),V=normalize(cameraPosition-vW);if(!gl_FrontFacing)N=-N;float nv=clamp(abs(dot(N,V)),0.,1.);
         float F=.04+.96*pow(1.-nv,5.);vec3 R=reflect(-V,N);vec3 env=texture2D(uEnv,eq(R)).rgb*uEnvI;
-        vec3 L=normalize(uLamp-vW);float sp=pow(max(dot(N,normalize(L+V)),0.),320.)*5.;float edge=pow(1.-nv,2.2);
+        vec3 L=normalize(uLamp-vW);float sp=pow(max(dot(N,normalize(L+V)),0.),900.)*1.6;float edge=pow(1.-nv,2.2);
         vec3 col=env*F+sp*uLampC+uTint*edge*.1;float a=clamp(F*.85+edge*.16+sp*.4,0.,1.)*uA;
         gl_FragColor=vec4(col*uA,a*.75);${OUT}}` });
   return m;
@@ -312,7 +312,7 @@ const meniscus = r => CFG.DISH.agar + .0022 * Math.pow(clamp((r - (DR - .012)) /
 const agarGeo = (() => { const g = new THREE.RingGeometry(.0002, DR - .0016, 96, 14); g.rotateX(-Math.PI / 2); const p = g.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, meniscus(Math.hypot(p.getX(i), p.getZ(i)))); g.computeVertexNormals(); return g; })();
 const agarSideGeo = new THREE.CylinderGeometry(DR - .0017, DR - .0017, CFG.DISH.agar - .0024 + .002, 72, 1, true).translate(0, (CFG.DISH.agar + .0024 + .002) / 2, 0);
 const plainAgar = std(PAL.honey, .22, 0, { emissive: new C(PAL.amber), emissiveIntensity: .25 });
-function closedDish(parent) { const g = grp(parent); glassMesh(dishGeo, g); glassMesh(lidGeo, g, {}, 22); mesh(agarGeo, plainAgar, g, { cast: false }); mesh(agarSideGeo, plainAgar, g, { cast: false }); return g; }
+function closedDish(parent) { const g = grp(parent); glassMesh(dishGeo, g, { a: .5, env: .6 }); glassMesh(lidGeo, g, { a: .5, env: .6 }, 22); mesh(agarGeo, plainAgar, g, { cast: false }); mesh(agarSideGeo, plainAgar, g, { cast: false }); return g; }
 const dishG = grp(lab, CFG.DISH.x, 0, CFG.DISH.z); PROPS.push([dishG, .25]);
 glassMesh(dishGeo, dishG);
 const lidG = grp(lab, CFG.LID.x, 0, CFG.LID.z); PROPS.push([lidG, .7]); { const l = glassMesh(lidGeo, lidG, {}, 22); lidG.rotation.z = Math.PI; lidG.position.y = .0177; }
@@ -361,7 +361,7 @@ const microAgar = new THREE.Mesh(new THREE.CircleGeometry(DR - .0016, 72).rotate
   fragmentShader: `uniform sampler2D uField;uniform vec3 uSG,uSR,uSY;uniform float uR,uT,uColony;varying vec3 vL;${NOISE}${DEADGLSL}
     vec2 vor(vec2 p){vec2 i=floor(p),f=fract(p);float d1=8.,d2=8.;for(int y=-1;y<=1;y++)for(int x=-1;x<=1;x++){vec2 g=vec2(x,y);vec2 o=vec2(h21(i+g),h21(i+g+17.));vec2 r=g+o-f;float d=dot(r,r);if(d<d1){d2=d1;d1=d;}else if(d<d2)d2=d;}return vec2(sqrt(d1),sqrt(d2));}
     void main(){vec2 uv=vL.xz/(2.*uR)+.5;vec4 F=texture2D(uField,uv);vec3 pig=uSG*F.g+uSR*F.b+uSY*F.a;float pw=clamp(F.g+F.b+F.a,0.,1.);vec3 pc=pig/max(F.g+F.b+F.a,.001);
-      vec3 bf=vec3(1.,.93,.78)*(1.02+fbm(vL.xz*400.)*.06)-vec3(.05,.06,.07)*smoothstep(.4,1.,fbm(vec2(vL.x*900.,vL.z*120.)));
+      vec3 bf=vec3(1.,.84,.6)*(1.02+fbm(vL.xz*400.)*.06)-vec3(.05,.06,.07)*smoothstep(.4,1.,fbm(vec2(vL.x*900.,vL.z*120.)));
       bf=mix(bf,bf*.7+pc*.35,pw*.6);
       float v=F.r*uColony;if(v>.04){vec2 w=vor(vL.xz*2600.);float edge=smoothstep(.0,.12,w.y-w.x);vec3 cc=mix(vec3(.9,.86,.74),pc,min(pw*1.3,.7));bf=mix(bf,cc*(.55+.45*edge)*(.9+.1*sin(uT+w.x*9.)),smoothstep(.05,.3,v));}
       float dd=deadMask(vL.xz);bf=mix(bf,vec3(.16,.13,.1)*(.6+.8*vn(vL.xz*3000.)),dd*.9);
@@ -511,13 +511,14 @@ function updPipettes(dt) {
       p.g.position.lerpVectors(p.snapFrom, p.anchor, s01(p.snap));
       // the barrel hangs from your pinch like a pendulum, so a drop always falls straight down from where your hand is
       for (let k = 0; k < 2; k++) { const sdt = dt / 2; _v.subVectors(p.tip, p.tipPrev).multiplyScalar(.82); p.tipPrev.copy(p.tip); p.tip.add(_v).y -= G * sdt * sdt; _v.subVectors(p.tip, p.g.position).setLength(PIP_LEN); p.tip.copy(p.g.position).add(_v); }
+      p.tip.lerp(_v.copy(p.g.position).setY(p.g.position.y - PIP_LEN), damp(dt, .09)); _v.subVectors(p.tip, p.g.position).setLength(PIP_LEN); p.tip.copy(p.g.position).add(_v); // settles back to hanging straight
       _v.subVectors(p.tip, p.g.position).normalize(); p.g.quaternion.setFromUnitVectors(_v2.set(0, -1, 0), _v);
       // the bulb follows your fingers between squeezes
       const open = clamp((h.d - .012) / .04, 0, 1); p.squash = Math.max(p.squash - dt * 4, (1 - open) * .55);
       // back to its own bottle: dock
       slotPos(p, _v); _v.y = BOTTLE_TOP + .016; const dTip = Math.hypot(p.tip.x - _v.x, p.tip.z - _v.z);
       if (!p.left && (dTip > .05 || p.tip.y > _v.y + .05)) p.left = true;
-      if (p.left && dTip < .016 && p.tip.y < _v.y + .012) { dock(p); continue; }
+      if (p.left && dTip < .024 && p.tip.y < _v.y + .015) { dock(p); continue; }
     }
     else if (p.state === 'return') { p.ret = Math.min(1, p.ret + dt / .45); slotPos(p, _v); p.g.position.lerpVectors(p.retFrom, _v, s01(p.ret)); p.g.position.y += Math.sin(p.ret * Math.PI) * .05; p.g.quaternion.slerpQuaternions(p.retQ, _q.identity(), s01(p.ret)); if (p.ret >= 1) { pipHome(p); sfx('clink', p.g.position); } }
     p.bulb.scale.set(1 + p.squash * .3, 1 - p.squash * .34, 1 + p.squash * .3); p.bulb.position.y = -p.squash * .002;
@@ -582,9 +583,9 @@ function gsSteps(n) {
   }
   if (U0 !== FU) { FU.set(U0); FV.set(V0); }
 }
-function pigDiffuse() { for (let j = 1; j < FN - 1; j++) for (let i = 1; i < FN - 1; i++) { const k = j * FN + i; for (let c = 0; c < 3; c++) { const q = k * 3 + c, v = PG[q]; PG2[q] = FMASK[k] ? (v + (PG[q - 3] + PG[q + 3] + PG[q - FN * 3] + PG[q + FN * 3] - 4 * v) * .06) * .9994 : 0; } } PG.set(PG2); }
+function pigDiffuse() { for (let j = 1; j < FN - 1; j++) for (let i = 1; i < FN - 1; i++) { const k = j * FN + i; for (let c = 0; c < 3; c++) { const q = k * 3 + c, v = PG[q]; PG2[q] = FMASK[k] ? (v + (PG[q - 3] + PG[q + 3] + PG[q - FN * 3] + PG[q + FN * 3] - 4 * v) * .012) * .9997 : 0; } } PG.set(PG2); }
 function deadKill() { if (!(AG.uDead.value.z > 0)) return; const dv = AG.uDead.value, R = dv.z * .95 * AG.uDeadF.value; for (let j = 1; j < FN - 1; j++) for (let i = 1; i < FN - 1; i++) { const x = ((i + .5) / FN - .5) * 2 * DR, z = ((j + .5) / FN - .5) * 2 * DR; if (Math.hypot(x - dv.x, z - dv.y) < R) FV[j * FN + i] *= .9; } }
-function fieldUpload() { for (let k = 0; k < FN * FN; k++) { const o = k * 4; fieldData[o] = Math.min(255, FV[k] * 600); fieldData[o + 1] = Math.min(255, PG[k * 3] * 230); fieldData[o + 2] = Math.min(255, PG[k * 3 + 1] * 230); fieldData[o + 3] = Math.min(255, PG[k * 3 + 2] * 230); } fieldTex.needsUpdate = true; }
+function fieldUpload() { for (let k = 0; k < FN * FN; k++) { const o = k * 4; fieldData[o] = Math.min(255, FV[k] * 600); fieldData[o + 1] = Math.min(255, PG[k * 3] * 360); fieldData[o + 2] = Math.min(255, PG[k * 3 + 1] * 360); fieldData[o + 3] = Math.min(255, PG[k * 3 + 2] * 360); } fieldTex.needsUpdate = true; }
 let fieldAcc = 0;
 function updField(dt) { fieldAcc += dt; if (fieldAcc < .05) return; fieldAcc = 0; if (S.stage >= 3 || S.colonyBoot) gsSteps(6); pigDiffuse(); deadKill(); fieldUpload(); }
 function colonyAt(x, z) { const [i, j] = toCell(x, z); return FV[j * FN + i]; }
@@ -621,7 +622,7 @@ mesh(new THREE.CylinderGeometry(.0075, .009, .006, 32), M.enamelCream, monG, { p
 const STAGE_COUNTS = { sparks: [0, 18, 12, 8, 6, 4, 4], cells: [0, 0, 240, 200, 160, 120, 100] };
 function buildStage(s) { // lay out what belongs to stage s (called once when it is reached)
   if (s === 1 && !L.sparks.length) for (let i = 0; i < 18; i++) { const [x, z] = dishPoint(.055); L.sparks.push({ x, z, ph: Math.random() * 7, c: STAINS[lineage()].c.clone().lerp(new C(PAL.spark), .55), born: T + i * .08 }); }
-  if (s === 2 && !L.cells.length) for (let i = 0; i < 240; i++) { const [x, z] = dishPoint(.058, i < 170 ? .011 : .03); L.cells.push({ x, z, r: rand(.00012, .00024), ph: Math.random() * 7, div: 0, divT: rand(2, 14), c: STAINS[lineage()].c.clone(), rot: Math.random() * 6, born: T + Math.random() * 6, vx: 0, vz: 0 }); }
+  if (s === 2 && !L.cells.length) for (let i = 0; i < 240; i++) { const [x, z] = dishPoint(.058, i < 170 ? .011 : .03); L.cells.push({ x, z, r: rand(.00022, .00042), ph: Math.random() * 7, div: 0, divT: rand(2, 14), c: STAINS[lineage()].c.clone(), rot: Math.random() * 6, born: T + Math.random() * 6, vx: 0, vz: 0 }); }
   if (s === 3) { S.colonyBoot = true; for (const d of S.drops.slice(-12)) seedColony(d[1], d[2], 3); for (let i = 0; i < 6; i++) { const [x, z] = dishPoint(.04, .015); seedColony(x, z, 2); } }
   if (s === 4 && !L.domes.length) { for (let i = 0; i < 28; i++) { const [x, z] = colonyPoint(); L.domes.push({ x, z, r: rand(.0014, .0034), lin: lineage(), born: T + rand(0, 5) }); }
     for (let i = 0; i < 6; i++) { const d = L.domes[i * 4]; L.spires.push({ x: d.x, z: d.z, h: rand(.006, .011), lin: d.lin, born: d.born + 1 }); }
@@ -726,7 +727,7 @@ function setPhase(p) { S.phase = p; S.t = 0; }
 function startRound(newSeq = true) { const n = CFG.ROUNDS[Math.min(S.round, CFG.ROUNDS.length - 1)]; if (newSeq || !S.seq.length) S.seq = genSeq(n); S.step = 0; S.stepT = 0; S.replayed = false; setPhase('listen'); }
 function dishDrop(st, x, z) {
   S.mix[st.glyph]++; S.drops.push([st.glyph, x, z]); if (S.drops.length > 40) S.drops.shift();
-  bloom(st.glyph, x, z, .9); if (S.stage >= 3) seedColony(x, z, 2);
+  bloom(st.glyph, x, z, 1.3); if (S.stage >= 3) seedColony(x, z, 2);
   if (S.phase !== 'drip') return;
   if (st.glyph === S.seq[S.step]) { S.step++; S.stepT = 0; FLASH.c.copy(st.c); FLASH.i = Math.max(FLASH.i, .55); FLASH.g = st.glyph; FLASH.gi = .8; vibe(st.note, now(), .22, dishPan()); if (S.step >= S.seq.length) success(); }
   else fail(x, z);
@@ -788,7 +789,7 @@ function updSwap() {
 
 // ═══════════════════════════ MICROSCOPE: swing it over the dish, lean into the eyepiece ═══════════════════════════
 const microRT = new THREE.WebGLRenderTarget(640, 640, { samples: 4 });
-const microCam = new THREE.PerspectiveCamera(9, 1, .004, .5); microCam.layers.enable(5); lab.add(microCam);
+const microCam = new THREE.PerspectiveCamera(6, 1, .004, .5); microCam.layers.enable(5); lab.add(microCam);
 const EYE = { uMap: { value: microRT.texture }, uAx: { value: new V() }, uRt: { value: new V() }, uUp: { value: new V() }, uTan: { value: Math.tan(MU.degToRad(22)) }, uA: { value: 0 }, uT: U.time };
 // the view is drawn at infinity (sampled by the direction you look along), so both eyes agree, like a real eyepiece
 const eyeDisc = new THREE.Mesh(new THREE.CircleGeometry(.05, 48), new THREE.ShaderMaterial({ ...PREMUL, depthTest: false, uniforms: EYE,
@@ -828,7 +829,7 @@ function renderMicro() {
   const xr = renderer.xr.enabled, rt = renderer.getRenderTarget(), tm = renderer.toneMapping, su = renderer.shadowMap.autoUpdate;
   for (const o of naked) o.visible = false; eyeDisc.visible = false; dimmer.visible = false;
   renderer.xr.enabled = false; renderer.shadowMap.autoUpdate = false; renderer.toneMapping = THREE.NoToneMapping;
-  renderer.setRenderTarget(microRT); renderer.setClearColor(0xf3e7c8, 1); renderer.clear(); renderer.render(scene, microCam);
+  renderer.setRenderTarget(microRT); renderer.setClearColor(0xf0d9a8, 1); renderer.clear(); renderer.render(scene, microCam);
   renderer.setClearColor(0x000000, 0); renderer.setRenderTarget(rt); renderer.xr.enabled = xr; renderer.shadowMap.autoUpdate = su; renderer.toneMapping = tm;
   for (const o of naked) o.visible = true; eyeDisc.visible = true; dimmer.visible = renderer.xr.isPresenting;
 }
@@ -1046,7 +1047,7 @@ window.__T = { S, L, PH, PIPS, SC, VO, AG, CFG, DBG, go, drip, answer, begin, fa
     const geo = sk.geometry.clone(); geo.deleteAttribute('skinIndex'); geo.deleteAttribute('skinWeight'); geo.computeBoundingBox(); const bb = geo.boundingBox, sz = bb.getSize(new V()), ax = sz.x > sz.y ? (sz.x > sz.z ? 'x' : 'z') : (sz.y > sz.z ? 'y' : 'z');
     if (ax === 'z') geo.rotateX(-Math.PI / 2); else if (ax === 'x') geo.rotateZ(Math.PI / 2); geo.computeBoundingBox(); const b2 = geo.boundingBox, c = b2.getCenter(new V()); geo.translate(-c.x, -b2.min.y, -c.z); const s = .032 / (b2.max.y - b2.min.y); geo.scale(s, s, s);
     const hm = mesh(geo, std(PAL.brass, .28, 1, { envMapIntensity: 1.2 }), monG, { p: [0, .006, 0] }); hm.userData.flip = true; } catch (e) { }
-  placeLab(new V(0, CFG.HOME.y, 0), 0); resetAll(true); setPhase('poster'); framePoster();
+  placeLab(new V(0, CFG.HOME.y, 0), 0); resetAll(true); setPhase('poster'); framePoster(); card('Culture No. 1', ['Day 12. They have', 'built a town.', '', '']);
   { const hidden = []; scene.traverse(o => { if (!o.visible) { hidden.push(o); o.visible = true; } }); try { renderer.compile(scene, camera); } catch (e) { } hidden.forEach(o => { o.visible = false; }); }
   renderer.setAnimationLoop(loop);
   const ok = SIM || (navigator.xr && await navigator.xr.isSessionSupported('immersive-ar').catch(() => false));
