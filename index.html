@@ -108,7 +108,7 @@ const CFG = {
   PINCH: { on: .02, gap: .02, cap: .035 }, HOVER: { on: .06, off: .09 }, // thumb-to-index metres; hysteresis after Meta's grab spec, a little looser for raw joints
   DROPS: 8, STEP_TIMEOUT: 10, DIM: .3,
   ROUNDS: [3, 4, 4, 5, 5, 6, 6], // sequence length per round; a success in round n brings stage n+1
-  HOME: { y: .74 }, GOD_TIME: 78, // seconds of town life after they recognise you, before they need more room
+  HOME: { y: .74 }, GOD_TIME: 52, // seconds of town life after they recognise you, before they need more room
  // ?sim / poster desk height
 };
 const STAINS = [
@@ -391,8 +391,8 @@ const rackG = grp(lab, CFG.RACK.x, 0, CFG.RACK.z); PROPS.push([rackG, .4]);
 const SLOT_X = [-.045, 0, .045], BOTTLE_TOP = .052, PIP_LEN = .105, PIP_REST_Y = .118;
 { mesh(new THREE.BoxGeometry(.15, .016, .05), M.walnut, rackG, { p: [0, .008, 0] });
   for (const x of [-.072, .072]) mesh(new THREE.CylinderGeometry(.0055, .0065, .07, 20), M.bakelite, rackG, { p: [x, .051, -.012] });
-  mesh(new THREE.BoxGeometry(.156, .007, .016), M.enamelCream, rackG, { p: [0, .085, -.012] });
-  for (const x of SLOT_X) mesh(new THREE.TorusGeometry(.0058, .0012, 8, 20), M.chrome, rackG, { p: [x, .0885, -.004], r: [Math.PI / 2, 0, 0] }); }
+  mesh(new THREE.BoxGeometry(.156, .007, .03), M.enamelCream, rackG, { p: [0, .085, -.001] });
+  for (const x of SLOT_X) mesh(new THREE.TorusGeometry(.0058, .0009, 8, 24), M.chrome, rackG, { p: [x, .0886, .006], r: [Math.PI / 2, 0, 0], cast: false }); } // collars sit on the bar, centred on each dropper
 const bottleGeo = lathe([[0, 0], [.0155, 0], [.0168, .003], [.017, .03], [.0145, .038], [.0075, .044], [.0072, .05], [.0082, .052], [.0082, BOTTLE_TOP], [.0065, BOTTLE_TOP], [.0065, .046], [0, .046]], 40);
 const bottleLiqGeo = lathe([[0, .0015], [.0148, .0015], [.0158, .004], [.0158, .028], [0, .028]], 36);
 STAINS.forEach((st, i) => { const b = grp(rackG, SLOT_X[i], .016, .006); st.bl = liquidMat(st.c, .55); st.pulse = 0; mesh(bottleLiqGeo, st.bl, b, { cast: false }); glassMesh(bottleGeo, b, { tint: '#d6d2b8' });
@@ -977,8 +977,7 @@ function updDish(dt) {
   if (p === 'drip') { S.stepT += dt; if (S.stepT > CFG.STEP_TIMEOUT) { if (!S.replayed) { startRound(false); S.replayed = true; } else fail(0, 0); } }
   if (p === 'success' && S.t > 2.6) { if (S.stage >= 5 && S.stage < 6 && !S.anthemDone) startAnthem(); else if (S.stage >= 6 && !S.recognised) { S.recognised = true; setPhase('recog'); S.monT = T + 3; monG.visible = true; chord(); } else setPhase('grow'); }
   if (p === 'grow' && S.recognised && !FIN.on && !S.towerDone && T - S.godStart > 12 && S.t > 3) startMeasure();
-  else if (p === 'grow' && S.recognised && !FIN.on && S.towerDone && !S.portraitDone && T - S.godStart > 48 && S.t > 3) startPortrait();
-  else if (p === 'grow' && S.recognised && !FIN.on && S.portraitDone && (T - S.godStart > CFG.GOD_TIME || S.godWins >= 3) && S.t > 4) startExpand();
+  else if (p === 'grow' && S.recognised && !FIN.on && S.towerDone && (T - S.godStart > CFG.GOD_TIME || S.godWins >= 3) && S.t > 4) startExpand();
   if (EVT_PHASES.has(p)) updEvents(dt);
   else if (p === 'grow' && S.t > (S.recognised ? 32 : S.stage >= 4 ? 7 : 5)) startRound();
   if (p === 'recog') { for (const [tt, n] of [[3.5, 3], [6, 4], [8.5, 8], [10, 6]]) if (S.t > tt && S.t - dt <= tt) fireworks(n); if (S.t > 8.5 && S.t - dt <= 8.5) cheer(); if (S.t > 15) { setPhase('grow'); S.godStart = T; news(['They know you now.', 'Drip a gift, any', 'colour. Tap the lamp', 'base for night.']); } }
@@ -1053,7 +1052,8 @@ function updScope(dt) {
   SC.tube.localToWorld(SC.eye.set(0, .1, 0)); // eyepiece mouth, world
   _v.set(0, 1, 0).transformDirection(SC.tube.matrixWorld); SC.eyeAxis.copy(_v).negate(); // looking into it
   SC.head.localToWorld(SC.obj.set(0, -.07, 0));
-  microCam.position.copy(toLab(_v2.copy(SC.obj))); microCam.up.set(0, 0, -1); microCam.lookAt(_v2.x, 0, _v2.z);
+  // lookAt and up are in WORLD space: aim straight down the lab's own vertical, so it works wherever the lab was placed on the desk
+  microCam.position.copy(toLab(_v2.copy(SC.obj))); microCam.up.set(0, 0, -1).applyQuaternion(lab.getWorldQuaternion(_q)); microCam.lookAt(toWorld(_v3.set(_v2.x, 0, _v2.z)));
   // how far into the eyepiece you are
   camera.getWorldPosition(_v); const d = _v.distanceTo(SC.eye);
   const tgt = SIM ? simLook : s01((.15 - d) / .08);
@@ -1324,6 +1324,10 @@ const visGoo = new THREE.Mesh(new THREE.SphereGeometry(.3, 40, 24), new THREE.Sh
       float n=gN(a*1.3+uGooT*.2)*.22+gN(a*5.)*.08;float th=1.0*(1.-uV);float m=smoothstep(th-.03,th+.03,e+n-.15);
       m=smoothstep(th+.05,th+.16,e+n*.4);vec3 c=vec3(.15,.11,.075)*(.55+.45*gN(a*9.+uGooT*.3))*(.7+.3*smoothstep(1.2,.3,e));c=mix(c,vec3(0.),uBlack);float al=max(m,uBlack);if(al<=.001)discard;gl_FragColor=vec4(c,al);${OUT}}` }));
 visGoo.renderOrder = 3000; visGoo.frustumCulled = false; visGoo.visible = false; scene.add(visGoo);
+// the blackout draws over everything (citizens included), so they fade out with the light instead of vanishing and showing the backdrop
+const blackout = new THREE.Mesh(new THREE.SphereGeometry(.3, 16, 12), new THREE.ShaderMaterial({ transparent: true, depthTest: false, depthWrite: false, side: THREE.BackSide, uniforms: VIS,
+  vertexShader: `void main(){gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`, fragmentShader: `uniform float uBlack;void main(){if(uBlack<=.001)discard;gl_FragColor=vec4(0.,0.,0.,uBlack);}` }));
+blackout.renderOrder = 3500; blackout.frustumCulled = false; visGoo.add(blackout);
 // captions and the end card: a filmstrip subtitle under your view, a title card in front of it
 function capTex(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t; }
 const capT = capTex(1024, 128), endT = capTex(1024, 640);
@@ -1340,7 +1344,8 @@ function drawEnd(stage) { const c = endT.image, g = c.getContext('2d'), w = c.wi
   else { g.fillStyle = PAL.rule; g.fillRect(w / 2 - 170, 196, 340, 4); g.fillStyle = PAL.cream; g.font = '500 110px Jost'; g.fillText('THE END', w / 2, 170 + 0); g.font = '400 30px Oswald'; g.fillStyle = PAL.brass; g.fillText('A  BELL-STYLE  CAUTIONARY  REEL', w / 2, 262); g.fillStyle = 'rgba(239,230,207,.75)'; g.font = 'italic 400 30px "Courier Prime"'; g.fillText('Next week: Why We Label Our Reagents.', w / 2, 352); g.fillStyle = PAL.cream; g.font = 'italic 400 34px "Courier Prime"'; g.fillText('Pinch, or click, to start a fresh culture.', w / 2, 440); g.font = '400 22px "Geist Mono", monospace'; g.fillStyle = 'rgba(239,230,207,.45)'; g.fillText('A NXT/WebXR PRODUCTION', w / 2, 560); }
   endT.needsUpdate = true; }
 const FIN = { on: false, t: 0, R: 0, c: new V(), hand: [0, 0], vis: 0, flags: 0, chant: 0, H: [] };
-const EXP = [{ x: CFG.STACK.x, z: CFG.STACK.z + .005 }, { x: .172, z: .102 }].map((e, k) => { const g = grp(lab, e.x, 0, e.z); glassMesh(dishGeo, g); const a = mesh(agarGeo, agarMat, g, { cast: false }); a.rotation.y = 1.7 + k * 2.1; mesh(agarSideGeo, agarMat, g, { cast: false }); g.visible = false; return { ...e, g, bridge: null }; });
+// spare dishes: clear of the tray rim (inner edge .2445 x .1545) and the microscope base
+const EXP = [{ x: -.171, z: .081 }, { x: .171, z: .081 }].map((e, k) => { const g = grp(lab, e.x, 0, e.z); glassMesh(dishGeo, g); const a = mesh(agarGeo, agarMat, g, { cast: false }); a.rotation.y = 1.7 + k * 2.1; mesh(agarSideGeo, agarMat, g, { cast: false }); g.visible = false; return { ...e, g, bridge: null }; });
 function startExpand() { FIN.on = true; FIN.t = 0; setPhase('expand'); CIV.ev = null; S.night = false; news(['They need room.', '', '']); sfx('ready', dishPan()); }
 function expandGo() { if (S.phase !== 'expand') return; setPhase('migrate'); sfx('pick', _v.set(CFG.STACK.x, .05, CFG.STACK.z)); }
 const CAPS = [[0, 'The citizens needed more room.'], [-1, ''], ];
@@ -1406,7 +1411,7 @@ function updHorde(dt) {
       if (!SIM) for (let k = 10; k < 14 && cov > .35 + (k - 10) * .1; k++) if (pts[k]) { _o.position.copy(pts[k]).y += .006; _o.rotation.set(0, T * .5 + k, Math.sin(T * 3 + k) * .1); _o.scale.setScalar(1); _o.updateMatrix(); FLAGS.setMatrixAt(nf, _o.matrix); FLAGS.setColorAt(nf, STAINS[k % 3].c); nf++; if (nf > FIN.flags) { FIN.flags = nf; say(3600, .05); sfx('tink', null, .4); } } }
     // your view: a vignette of them closing in from every edge, a heaving pile of real little citizens over a dark depth,
     // the window onto the room shrinking and shrinking. Two depth tiers: a dense pile behind, the climbers at the leading edge in front.
-    if (FIN.vis > 0 && VIS.uBlack.value < .6) { const fw = VIS.uFwd.value, rt = new V().crossVectors(fw, UP).normalize(), up = new V().crossVectors(rt, fw).normalize(); const th = 1.0 * (1 - FIN.vis);
+    if (FIN.vis > 0) { const fw = VIS.uFwd.value, rt = new V().crossVectors(fw, UP).normalize(), up = new V().crossVectors(rt, fw).normalize(); const th = 1.0 * (1 - FIN.vis);
       const put = (e, ph, d) => _hp.copy(fw).multiplyScalar(Math.cos(e)).addScaledVector(rt, Math.sin(e) * Math.cos(ph)).addScaledVector(up, Math.sin(e) * Math.sin(ph)).multiplyScalar(d).add(cam);
       const NP = 430; for (let k = 0; k < NP && n < HN; k++) { const e = 1.34 * Math.sqrt((k + .5) / NP), ph = k * 2.39996; if (e < th + .05) continue; const heave = Math.sin(T * 2.6 + k * .9) * .012;
         put(e - heave * .5, ph, .2 + Math.sin(k * 3.1) * .025 + heave); hordeAdd(n++, _hp, .019 * (1 + .18 * Math.sin(k * 1.7)), cam, Math.abs(Math.sin(T * 5 + k)) * .003, STAINS[k % 3].c); }
@@ -1421,8 +1426,8 @@ function updHorde(dt) {
 }
 // the sprawl: after the suburbs, outposts on the tray and settlements on the furniture, steady at first, then "hm, that's a lot"
 function buildSettlements() { const B = CFG.BIN, R = CFG.RACK, SC0 = CFG.SCOPE, LP = CFG.LAMP;
-  FIN.sets = [[-.07, 0, .145, .02], [.07, 0, .148, .018], [.0, 0, -.125, .02], [.09, 0, -.13, .016], [.235, 0, -.125, .014], [-.245, 0, -.02, .012], [.0, 0, .155, .012],
-    [R.x - .022, .089, R.z - .012, .006], [R.x + .022, .089, R.z - .012, .006], [SC0.x, .022, SC0.z + .01, .02], [LP.x, .017, LP.z, .022], [-.12, 0, .06, .012]]
+  FIN.sets = [[-.068, 0, .138, .016], [.068, 0, .138, .016], [.0, 0, -.125, .02], [.09, 0, -.13, .016], [.22, 0, -.125, .014], [-.225, 0, -.035, .012], [.0, 0, .14, .01],
+    [R.x - .022, .089, R.z - .012, .006], [R.x + .022, .089, R.z - .012, .006], [SC0.x, .022, SC0.z + .01, .02], [LP.x, .017, LP.z, .022]]
     .map(([x, y, z, r], k) => ({ x, y, z, r, k }));
   FIN.spawn = 0; FIN.pop = L.beings.length + 44; }
 function settle(st, t) { const a = Math.random() * 6.283, rr = Math.sqrt(Math.random()) * st.r, x = st.x + Math.cos(a) * rr - CFG.DISH.x, z = st.z + Math.sin(a) * rr - CFG.DISH.z, y = st.y - CFG.DISH.agar + .0001, lin = lineage(), r = Math.random();
@@ -1434,7 +1439,7 @@ function updSprawl(dt, t) {
   while (FIN.spawn > 1) { FIN.spawn--; settle(FIN.sets[Math.floor(Math.pow(Math.random(), 1.3) * unlocked)], t); if (Math.random() < .3) say(rand(2600, 3400), .03); }
   FIN.pop *= 1 + dt * (tg < 20 ? .04 : .04 + (tg - 20) * .03); // steady, then not
   updTelescope(dt, t - 7);
-  const caps = [[0, 'The suburbs filled up nicely.'], [4, 'Then the outskirts.'], [7, 'They wondered what you were.'], [11, 'So they built an instrument.'], [16.5, 'It is pointed at you.'], [21, 'First observation: the Creator is upside down.'], [25, 'Second observation: the Creator is wearing a box.'], [29.5, 'Science marches on.'], [33, 'Then the furniture.'], [38.5, 'Hm. That is quite a lot.'], [43.5, 'That is a very great deal.']];
+  const caps = [[0, 'The suburbs filled up nicely.'], [4, 'Then the outskirts.'], [7, 'They wondered what you were.'], [11, 'So they built an instrument.'], [16.5, 'It is pointed at you.'], [21, 'First observation: the Creator is very large.'], [25, 'Second observation: the Creator is looking back.'], [29.5, 'They waved. Just in case.'], [33, 'Then the furniture.'], [38.5, 'Hm. That is quite a lot.'], [43.5, 'That is a very great deal.']];
   let cap = ''; for (const [ct, tx] of caps) if (t >= ct) cap = tx; caption(cap);
   if (t < 7 || t > 31) card('Census', [`Population: ${Math.round(FIN.pop).toLocaleString('en-US')}`, t < 16 ? 'Steady growth.' : t < 24 ? 'Healthy growth.' : 'Growth.', t < 24 ? 'Spirits: excellent.' : 'Spirits: excellent!!', '']);
   if (t > 33 && t - dt <= 33) { fireworks(3); fanfare(); } if (t > 41 && t - dt <= 41) { fireworks(5); cheer(); }
@@ -1463,15 +1468,16 @@ function bakeCrowd() {
 // ═══════════════════════════ THE OBSERVATORY: on the bin lid they build a telescope, aim it at your real head, and project what they see ═══════════════════════════
 const TEL = { built: false, tt: -1, aimed: 0, screen: 0, peek: 0, q: new Qn() };
 const teleG = grp(lab, CFG.BIN.x, CFG.BIN.h - CFG.TRAY.base + .024, CFG.BIN.z); teleG.visible = false;
-mesh(new THREE.CylinderGeometry(.021, .022, .003, 32), M.walnut, teleG, { p: [0, .0015, 0] });
-const telePoles = [[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([a, b]) => mesh(new THREE.CylinderGeometry(.0007, .0007, .03, 5).translate(0, .015, 0), M.walnut, teleG, { p: [a * .012, .003, b * .012] }));
-const teleRings = [.014, .029].map(y => mesh(new THREE.TorusGeometry(.017, .0006, 4, 24), M.walnut, teleG, { p: [0, y, 0], r: [Math.PI / 2, 0, 0], cast: false }));
-const teleFork = mesh(new THREE.BoxGeometry(.012, .004, .006), M.brass, teleG, { p: [0, .032, 0] });
+const TG = std('#f6ecd6', .32, 0, { envMapIntensity: .9, emissive: new C('#ffd9a0'), emissiveIntensity: .14 }), TB = STAINS.map(st => new THREE.MeshBasicMaterial({ color: st.c.clone().multiplyScalar(1.4) })); // their gel, their stain glow
+mesh(new THREE.SphereGeometry(.021, 32, 10, 0, 6.283, 0, Math.PI / 2).scale(1, .28, 1), TG, teleG); mesh(new THREE.TorusGeometry(.0205, .0008, 6, 40), TB[0], teleG, { p: [0, .0008, 0], r: [Math.PI / 2, 0, 0], cast: false }); // an observatory dome for a plinth
+const telePoles = [[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([a, b]) => mesh(new THREE.CylinderGeometry(.0005, .0011, .03, 8).translate(0, .015, 0), TG, teleG, { p: [a * .012, .003, b * .012] }));
+const teleRings = [.014, .029].map(y => mesh(new THREE.TorusGeometry(.017, .0007, 6, 32), TG, teleG, { p: [0, y, 0], r: [Math.PI / 2, 0, 0], cast: false }));
+const teleFork = mesh(new THREE.SphereGeometry(.0055, 16, 8, 0, 6.283, 0, Math.PI / 2).scale(1.3, .8, 1), TG, teleG, { p: [0, .032, 0] });
 const telePivot = grp(teleG, 0, .036, 0), teleTube = grp(telePivot);
-mesh(new THREE.CylinderGeometry(.0055, .0048, .056, 20).rotateX(Math.PI / 2), M.crinkle, teleTube, { p: [0, 0, .006] });
-mesh(new THREE.TorusGeometry(.0058, .0009, 6, 20), M.brass, teleTube, { p: [0, 0, .034] }); mesh(new THREE.CylinderGeometry(.0018, .0022, .01, 10).rotateX(Math.PI / 2), M.brass, teleTube, { p: [0, 0, -.026] });
-const teleLens = mesh(new THREE.CircleGeometry(.0048, 20), new THREE.MeshStandardMaterial({ color: '#cfe6ff', metalness: .2, roughness: .05, emissive: new C('#8fb9e8'), emissiveIntensity: .5 }), lab, { cast: false });
-const teleCrank = mesh(new THREE.TorusGeometry(.005, .0008, 4, 12), M.brass, teleG, { p: [.016, .012, .0] , r: [0, Math.PI / 2, 0] });
+mesh(new THREE.CylinderGeometry(.0055, .0045, .056, 24).rotateX(Math.PI / 2), TG, teleTube, { p: [0, 0, .006] }); [-.012, .004, .02].forEach((z, k) => mesh(new THREE.TorusGeometry(.0053 - k * -.0001, .0007, 6, 24), TB[k], teleTube, { p: [0, 0, z], cast: false })); mesh(new THREE.CylinderGeometry(.0072, .0072, .0012, 24).rotateX(Math.PI / 2), TG, teleTube, { p: [0, 0, .028] }); // stain bands, a spire's disc for a sunshade
+mesh(new THREE.TorusGeometry(.0058, .0009, 8, 24), TG, teleTube, { p: [0, 0, .034] }); mesh(new THREE.SphereGeometry(.0026, 12, 8).scale(1, 1, 1.6), TG, teleTube, { p: [0, 0, -.026] });
+const teleLens = mesh(new THREE.CircleGeometry(.0048, 20), new THREE.MeshBasicMaterial({ color: new C('#fff1c8') }), lab, { cast: false });
+const teleCrank = mesh(new THREE.TorusGeometry(.005, .0008, 6, 16), TG, teleG, { p: [.016, .012, .0] , r: [0, Math.PI / 2, 0] });
 // the screen: a little projection sheet beside it, showing you as they see you (upside down: it is a telescope)
 const teleRT = new THREE.WebGLRenderTarget(256, 256, { samples: 2 }), teleCam = new THREE.PerspectiveCamera(30, 1, .05, 3); teleCam.layers.enable(7); scene.add(teleCam); { const fl = new THREE.PointLight('#ffe2b8', 2.2, 2, 1); fl.layers.set(7); fl.position.set(.05, .08, 0); teleCam.add(fl); const am = new THREE.AmbientLight('#c8b8a0', .5); am.layers.set(7); scene.add(am); } // light only the telescope sees
 const screenG = grp(teleG, -.026, 0, .022); screenG.visible = false;
@@ -1498,11 +1504,11 @@ function updTelescope(dt, tt) { // tt: seconds since they started building
   if (tt > 9 && tt < 12.5) { if (Math.floor(tt * 6) !== Math.floor((tt - dt) * 6)) { noiseHit(now(), .02, 3200, 3, .05, A.sfx); TEL.aimed = Math.min(1, TEL.aimed + .09); } teleCrank.rotation.x += dt * 9; } // cranking it round, click by click
   if (tt >= 12.5) TEL.aimed = 1; TEL.built = tt > 9;
   if (tt > 12.6 && tt - dt <= 12.6) { vibe(1318.5, now(), .1, null, 1); }
-  if (tt > 14 && tt - dt <= 14) { screenG.visible = true; sfx('tick', null); for (const b of L.beings) if (Math.random() < .5) { b.act = 'startle'; b.actT = 1.4; } say(3400, .06); }
+  if (tt > 14 && tt - dt <= 14) { sfx('tick', null); for (const b of L.beings) if (Math.random() < .5) { b.act = 'startle'; b.actT = 1.4; } say(3400, .06); }
   SCR.uOn.value = s01((tt - 14) / .6) * (tt > 14 && tt < 14.6 ? (Math.random() < .5 ? .3 : 1) : 1);
-  if (tt > 18 && tt - dt <= 18) { cheer(); fireworks(2); } if (tt > 22.5 && tt - dt <= 22.5) say(2200, .06);
+  if (tt > 18 && tt - dt <= 18) { cheer(); fireworks(2); } if (tt > 25 && tt - dt <= 25) { for (const b of L.beings) if (Math.random() < .7) { b.act = 'startle'; b.actT = .8; } say(2600, .05); } if (tt > 22.5 && tt - dt <= 22.5) say(2200, .06);
   screenG.position.y = lerp(-.04, 0, s01((tt - 13.4) / .6)); if (!screenG.visible) screenG.position.y = -.04;
-  card('Observatory', ['Instrument: telescope.', 'Subject: you.', tt > 14 ? 'Findings: see sheet.' : '', '']);
+  card('Observatory', ['Instrument: telescope.', 'Subject: you.', tt > 21 ? 'Findings: very large.' : '', tt > 25 ? 'Also looking back.' : '']);
 }
 function teleTrack(dt) { // aim at your real head; the screen turns to face you; the stand-in follows you
   camera.getWorldPosition(_v); camera.getWorldQuaternion(_q); youG.position.copy(_v); youG.quaternion.copy(_q); youG.userData.crest.material.color.copy(STAINS[favStain()].c);
@@ -1513,7 +1519,8 @@ function teleTrack(dt) { // aim at your real head; the screen turns to face you;
   screenG.getWorldPosition(_v3); const yaw = Math.atan2(_v.x - _v3.x, _v.z - _v3.z); screenG.rotation.y = yaw - teleG.getWorldQuaternion(new Qn()).angleTo(new Qn()) * 0 - lab.rotation.y;
   teleCam.position.copy(_v3.set(0, 0, .04).applyMatrix4(teleTube.matrixWorld)); teleCam.lookAt(_v); }
 const _q2 = new Qn();
-function renderTele() { if (!(SCR.uOn.value > .01) || !screenG.visible) return; if ((TEL.frame = (TEL.frame || 0) + 1) % 2) return;
+function renderTele() { return; // no sheet: they look, you are not shown
+  if (!(SCR.uOn.value > .01) || !screenG.visible) return; if ((TEL.frame = (TEL.frame || 0) + 1) % 2) return;
   const xr = renderer.xr.enabled, rt = renderer.getRenderTarget(), tm = renderer.toneMapping, su = renderer.shadowMap.autoUpdate;
   for (const o of naked) o.visible = false; eyeDisc.visible = false; dimmer.visible = false; const vg = visGoo.visible; visGoo.visible = false; capM.visible = false; const ev = endM.visible; endM.visible = false;
   renderer.xr.enabled = false; renderer.shadowMap.autoUpdate = false; renderer.toneMapping = THREE.NoToneMapping;
@@ -1525,7 +1532,7 @@ function telescopeCrowd(n, cam) { // two cranking, one climbing to the eyepiece,
   const put = (x, y, z, look, size = .0052, jump = 0, c = STAINS[0].c) => { _hp.set(x, y, z).applyQuaternion(lab.quaternion).add(b); hordeAdd(n++, _hp, size, look, jump, c); };
   const head = _v.copy(cam); for (let k = 0; k < 2; k++) put(.018 + k * .004, .003, k ? .006 : -.006, _v2.set(b.x, b.y, b.z), .0052, Math.abs(Math.sin(T * 9 + k * 3)) * .0012, STAINS[k + 1].c);
   if (tt > 12.5) { const k = s01((tt - 12.5) / 1.2); teleTube.updateMatrixWorld(true); const eye = new V(0, 0, -.032).applyMatrix4(teleTube.matrixWorld); _hp.copy(b).add(_v4.set(-.012, .003, -.012).applyQuaternion(lab.quaternion)).lerp(eye.add(_v4.set(0, -.006, 0)), k); hordeAdd(n++, _hp, .0052, head, 0, STAINS[2].c); }
-  if (tt > 14) for (let k = 0; k < 9; k++) { const a = k / 8 * 1.6 - .8; put(-.026 + Math.sin(a) * .016, .003, .006 - Math.cos(a) * .004 + .0, _v2.copy(screenG.getWorldPosition(new V())), .0052, (tt > 14 && tt < 16) || (tt > 18 && tt < 20) ? Math.abs(Math.sin(T * 10 + k)) * .003 : 0, STAINS[k % 3].c); }
+  if (tt > 14) for (let k = 0; k < 9; k++) { const a = k / 8 * 1.6 - .8; put(Math.sin(a * 2.2) * .025, .002, Math.cos(a * 2.2) * .025, head, .0052, (tt > 14 && tt < 16) || (tt > 18 && tt < 20) ? Math.abs(Math.sin(T * 10 + k)) * .003 : 0, STAINS[k % 3].c); }
   return n; }
 function restart() { teleG.visible = screenG.visible = teleLens.visible = false; TEL.built = false; TEL.aimed = 0; SCR.uOn.value = 0; FIN.on = false; FIN.cardK = 0; FIN.click = false; FIN.hand = [0, 0]; FIN.flags = 0; FIN.vis = 0; GOO.uGooR.value = 0; GOO.uGrey.value = 0; VIS.uV.value = VIS.uBlack.value = 0; visGoo.visible = endM.visible = deskGoo.visible = false; caption(''); MUS.det = 0; MUS.slow = 0;
   EXP.forEach(e => { e.g.visible = false; if (e.bridge) { lifeG.remove(e.bridge); e.bridge = null; } }); cardG.visible = true; cardG.position.set(CFG.CARD.x, 0, CFG.CARD.z); cardG.rotation.y = -.42; lifeG.visible = true; HORDE.count = HCREST.count = FLAGS.count = 0;
